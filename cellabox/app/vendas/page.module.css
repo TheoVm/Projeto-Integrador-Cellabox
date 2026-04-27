@@ -1,0 +1,16 @@
+.mainContainer {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.mainContainer h2 {
+  color: #333;
+  margin-bottom: 1rem;
+  font-size: 1.6rem;
+}
+
+.mainContainer p {
+  color: #666;
+  line-height: 1.6;
+}
