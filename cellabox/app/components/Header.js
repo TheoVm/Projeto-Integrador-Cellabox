@@ -16,6 +16,7 @@ export default function Header() {
           <a href="/vendas">Vendas</a>
           <a href="/financas">Finanças</a>
           <a href="/clientes">Clientes</a>
+          <a href="/ingredientes">Ingredientes</a>
           <a href="/produtos-embalagens">Produtos e Embalagens</a>
         </nav>
       </div>
