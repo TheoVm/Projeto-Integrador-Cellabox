@@ -1,17 +1,144 @@
 .mainContainer {
   padding: 2rem;
-  max-width: 1200px;
-  margin: 0 auto;
+  display: flex;
+  justify-content: center;
 }
 
-.mainContainer h2 {
+.card {
+  background: #F1E9D6;
+  border: 1px solid #ccc;
+  border-radius: 12px;
+  padding: 2rem;
+  max-width: 900px;
+  width: 100%;
+}
+
+.topSection {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+.info {
+  width: 100%;
+}
+
+.info h1 {
+  margin: 0;
+  font-size: 1.8rem;
+  color: #222;
+}
+
+.info hr {
+  margin: 0.8rem 0;
+  border: none;
+  border-top: 1px solid #999;
+}
+
+.info p {
+  margin-top: 0.5rem;
+  color: #555;
+  line-height: 1.5;
+}
+
+.metrics {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.metrics div {
+  display: flex;
+  flex-direction: column;
+}
+
+.metrics span {
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.metrics strong {
+  color: green;
+  font-size: 1rem;
+  margin-top: 0.2rem;
+}
+
+.bottomRow {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.sectionWrapper {
+  flex: 0.6;
+}
+
+.sectionWrapperSmall {
+  flex: 0.4;
+}
+
+.sectionTitle {
+  margin-left: 8px;
+  margin-bottom: 4px;
+  font-size: 0.95rem;
+  font-weight: 600;
   color: #333;
-  margin-bottom: 1rem;
-  font-size: 1.6rem;
 }
 
-.mainContainer p {
-  color: #666;
-  line-height: 1.6;
+.section,
+.sectionSmall {
+  border: 1px solid #999;
+  border-radius: 10px;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.table2 {
+  margin-top: 0.3rem;
+}
+
+.rowHeader2 {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1rem;
+  font-weight: 600;
+  border-bottom: 1px solid #333;
   margin-bottom: 0.5rem;
+  padding-bottom: 0.3rem;
+  font-size: 0.9rem;
+}
+
+.row2 {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1rem;
+  font-size: 0.9rem;
+  padding: 0.35rem 0;
+}
+
+.row2 span:last-child {
+  text-align: right;
+}
+
+@media (max-width: 768px) {
+  .card {
+    padding: 1.2rem;
+  }
+
+  .bottomRow {
+    flex-direction: column;
+  }
+
+  .metrics {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .topSection {
+    flex-direction: column;
+  }
+
+  .sectionWrapper,
+  .sectionWrapperSmall {
+    width: 100%;
+  }
 }
