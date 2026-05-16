@@ -1,51 +1,66 @@
 'use client'
 
 import Link from 'next/link';
-
 import styles from './list.module.css';
 
-export default function ClientesList({ clients }) {
-
+export default function ClientesList({ clients, onDelete }) {
   const lista = clients || [];
 
+  const gridStyle = {
+    display: 'grid',
+    gridTemplateColumns: '1fr 160px 100px',
+    alignItems: 'center',
+  };
+
   return (
-
     <div className={styles.container}>
-
       <div className={styles.table}>
 
-        <div className={styles.rowHeader}>
-
-          <div>Cliente</div>
-
-          <div style={{ textAlign: 'right' }}>
-            Total (R$)
-          </div>
-
+        <div className={styles.rowHeader} style={gridStyle}>
+          <div className={styles.left}>Cliente</div>
+          <div className={styles.right} style={{ textAlign: 'right' }}>Total (R$)</div>
+          <div></div>
         </div>
 
         {lista.map((c) => (
-
-          <Link
+          <div
             key={c.id}
-            href={`/clientes/${c.id}`}
             className={`${styles.row} ${styles.rowData}`}
+            style={gridStyle}
           >
 
-            <span className={styles.left}>
-              {c.nome}
-            </span>
+   
+            <Link href={`/clientes/${c.id}`} style={{ display: 'contents' }}>
+              <span className={styles.left}>
+                {c.nome}
+              </span>
 
-            <span className={styles.right}>
-              R$ {Number(c.valor || 0).toFixed(2)}
-            </span>
+              <span className={styles.right} style={{ textAlign: 'right' }}>
+                R$ {Number(c.valor || 0).toFixed(2)}
+              </span>
+            </Link>
+            
 
-          </Link>
-
+            <div style={{ textAlign: 'right' }}>
+              <button
+                onClick={() => onDelete(c.id)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#ff4d4d',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '14px',
+                  whiteSpace: 'nowrap',
+                  padding: '12px 0' 
+                }}
+              >
+                Excluir
+              </button>
+            </div>
+          </div>
         ))}
-
       </div>
-
     </div>
   );
 }
