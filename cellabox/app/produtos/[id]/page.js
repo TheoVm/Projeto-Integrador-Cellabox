@@ -9,19 +9,32 @@ import styles from './page.module.css';
 
 export default function ProdutoIndividual() {
   const { id } = useParams();
+  
   const [produto, setProduto] = useState(null);
   const [ingredientesBase, setIngredientesBase] = useState([]);
   const [embalagensBase, setEmbalagensBase] = useState([]);
   const [savingPackaging, setSavingPackaging] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Estados de edição do cabeçalho
+  const [editando, setEditando] = useState(false);
+  const [nomeEditado, setNomeEditado] = useState('');
+  const [descricaoEditada, setDescricaoEditada] = useState('');
+  const [precoEditado, setPrecoEditado] = useState('');
+
   useEffect(() => {
     async function carregarProduto() {
       setLoading(true);
       setIngredientesBase(getStoredIngredients());
       setEmbalagensBase(getStoredPackaging());
+      
       const data = await getProduto(id);
-      setProduto(data);
+      if (data) {
+        setProduto(data);
+        setNomeEditado(data.nome || '');
+        setDescricaoEditada(data.descricao || '');
+        setPrecoEditado(data.precoVenda || data.preco || '');
+      }
       setLoading(false);
     }
 
@@ -30,14 +43,16 @@ export default function ProdutoIndividual() {
 
   const ingredientes = useMemo(() => produto?.ingredientes || [], [produto]);
   const embalagens = useMemo(() => produto?.embalagens || [], [produto]);
+  
   const custoProduto = useMemo(() => {
     return calculateProductCost(ingredientes, ingredientesBase);
   }, [ingredientes, ingredientesBase]);
 
   const lucro = useMemo(() => {
     if (!produto) return 0;
-    return Number(produto.precoVenda || produto.preco || 0) - custoProduto;
-  }, [produto, custoProduto]);
+    const precoAtual = editando ? Number(precoEditado || 0) : Number(produto.precoVenda || produto.preco || 0);
+    return precoAtual - custoProduto;
+  }, [produto, custoProduto, editando, precoEditado]);
 
   const embalagensIds = useMemo(() => {
     return new Set(embalagens.map((embalagem) => getPackagingId(embalagem)));
@@ -46,6 +61,24 @@ export default function ProdutoIndividual() {
   const embalagensDisponiveis = useMemo(() => {
     return embalagensBase.filter((embalagem) => !embalagensIds.has(getPackagingId(embalagem)));
   }, [embalagensBase, embalagensIds]);
+
+  async function salvarEdicao() {
+    try {
+      const dadosAtualizados = {
+        nome: nomeEditado,
+        descricao: descricaoEditada,
+        precoVenda: Number(precoEditado)
+      };
+      await updateProduto(id, dadosAtualizados);
+      
+      setProduto({ ...produto, ...dadosAtualizados });
+      setEditando(false);
+      alert("Informações do produto atualizadas!");
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao atualizar produto.');
+    }
+  }
 
   async function salvarEmbalagens(nextEmbalagens) {
     setSavingPackaging(true);
@@ -89,13 +122,48 @@ export default function ProdutoIndividual() {
   return (
     <main className={styles.mainContainer}>
       <div className={styles.card}>
+        
         <div className={styles.topSection}>
           <div className={styles.imagePlaceholder}>{produto.nome?.slice(0, 1) || 'P'}</div>
 
-          <div className={styles.info}>
-            <h1>{produto.nome}</h1>
-            <hr />
-            <p>{produto.descricao || 'Sem descrição cadastrada.'}</p>
+          <div className={styles.info} style={{ flex: 1 }}>
+            {editando ? (
+              <>
+                <input 
+                  value={nomeEditado} 
+                  onChange={(e) => setNomeEditado(e.target.value)} 
+                  style={{ fontSize: '24px', fontWeight: 'bold', width: '100%', marginBottom: '10px', padding: '5px' }}
+                />
+                <hr />
+                <textarea 
+                  value={descricaoEditada} 
+                  onChange={(e) => setDescricaoEditada(e.target.value)} 
+                  style={{ width: '100%', minHeight: '60px', marginTop: '10px', padding: '5px' }}
+                />
+              </>
+            ) : (
+              <>
+                <h1>{produto.nome}</h1>
+                <hr />
+                <p>{produto.descricao || 'Sem descrição cadastrada.'}</p>
+              </>
+            )}
+          </div>
+          
+          <div style={{ marginLeft: '20px', alignSelf: 'flex-start' }}>
+            {editando ? (
+              <button 
+                onClick={salvarEdicao} 
+                style={{ background: '#4CAF50', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>
+                Salvar
+              </button>
+            ) : (
+              <button 
+                onClick={() => setEditando(true)} 
+                style={{ background: '#f0f0f0', border: '1px solid #ccc', padding: '8px 15px', borderRadius: '5px', cursor: 'pointer' }}>
+                Editar
+              </button>
+            )}
           </div>
         </div>
 
@@ -107,7 +175,16 @@ export default function ProdutoIndividual() {
 
           <div>
             <span>Preço de venda</span>
-            <strong>R$ {Number(produto.precoVenda || produto.preco || 0).toFixed(2)}</strong>
+            {editando ? (
+               <input 
+                 type="number" 
+                 value={precoEditado} 
+                 onChange={(e) => setPrecoEditado(e.target.value)} 
+                 style={{ width: '100px', fontSize: '16px', fontWeight: 'bold', padding: '2px' }}
+               />
+            ) : (
+              <strong>R$ {Number(produto.precoVenda || produto.preco || 0).toFixed(2)}</strong>
+            )}
           </div>
 
           <div>

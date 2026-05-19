@@ -1,28 +1,83 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import styles from './page.module.css';
 import IngredientesList from '../components/IngredientesList';
-import { getStoredIngredients, saveStoredIngredients } from '../utils/ingredients';
+import { 
+  createIngrediente, 
+  getIngredientes, 
+  updateIngrediente, 
+  deleteIngrediente 
+} from '@/services/back4app';
 
 export default function Ingredientes() {
   const [showModal, setShowModal] = useState(false);
-  const [items, setItems] = useState(() => getStoredIngredients());
+  const [items, setItems] = useState([]);
   const [nome, setNome] = useState('');
   const [valor, setValor] = useState('');
 
-  function atualizarIngredientes(updated) {
-    setItems(updated);
-    saveStoredIngredients(updated);
+  useEffect(() => {
+    carregarIngredientes();
+  }, []);
+
+  async function carregarIngredientes() {
+    try {
+      const dados = await getIngredientes();
+      const formatados = dados.map((it) => ({
+        id: it.objectId,
+        nome: it.nome,
+        valor: it.valor || 0
+      }));
+      setItems(formatados);
+    } catch (error) {
+      console.error(error);
+    }
   }
 
-  function salvarIngrediente() {
+  function atualizarEstadoLocal(novosItens) {
+    setItems(novosItens);
+  }
+
+  async function salvarEdicaoBanco(id, novoValor) {
+    try {
+      await updateIngrediente(id, { valor: Number(novoValor) });
+      console.log('Valor atualizado no banco de dados!');
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao atualizar valor do ingrediente no servidor.');
+    }
+  }
+
+  async function removerIngrediente(id) {
+    const confirmar = confirm("Tem certeza que deseja excluir este ingrediente?");
+    if (!confirmar) return;
+
+    try {
+      await deleteIngrediente(id);
+      alert('Ingrediente excluído com sucesso!');
+      await carregarIngredientes();
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao excluir ingrediente.');
+    }
+  }
+
+  async function salvarIngrediente() {
     if (!nome) return alert('Preencha o nome');
-    const novo = { id: String(Date.now()), nome, valor: Number(valor || 0) };
-    atualizarIngredientes([novo, ...items]);
-    setShowModal(false);
-    setNome('');
-    setValor('');
+    
+    const novo = { nome, valor: Number(valor || 0) };
+    
+    try {
+      await createIngrediente(novo);
+      alert('Ingrediente adicionado com sucesso!');
+      await carregarIngredientes();
+      setShowModal(false);
+      setNome('');
+      setValor('');
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao salvar ingrediente no banco.');
+    }
   }
 
   return (
@@ -39,7 +94,12 @@ export default function Ingredientes() {
         <button className={styles.addButton} onClick={() => setShowModal(true)}>+ Adicionar</button>
       </div>
 
-      <IngredientesList initial={items} onChange={atualizarIngredientes} />
+      <IngredientesList 
+        initial={items} 
+        onChange={atualizarEstadoLocal} 
+        onSave={salvarEdicaoBanco}
+        onDelete={removerIngrediente}
+      />
 
       {showModal && (
         <div className={styles.overlay}>

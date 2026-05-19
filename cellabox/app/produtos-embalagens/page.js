@@ -7,6 +7,7 @@ import styles from "./page.module.css";
 import {
   createProduto,
   getProdutos,
+  deletarProduto 
 } from "@/services/back4app";
 import { calculateIngredientCost, calculateProductCost, getStoredIngredients } from "../utils/ingredients";
 import { getPackagingId, getStoredPackaging, saveStoredPackaging } from "../utils/packaging";
@@ -25,11 +26,8 @@ export default function ProdutosEmbalagens() {
   const [embalagensSelecionadas, setEmbalagensSelecionadas] = useState([]);
 
   const [nome, setNome] = useState("");
-
   const [descricao, setDescricao] = useState("");
-
   const [custo, setCusto] = useState("");
-
   const [preco, setPreco] = useState("");
 
   const [ingredientes, setIngredientes] = useState([
@@ -41,14 +39,11 @@ export default function ProdutosEmbalagens() {
   }, []);
 
   async function carregarProdutos() {
-
     const dados = await getProdutos();
-
     setProdutos(dados);
   }
 
   function addIngrediente() {
-
     setIngredientes([
       ...ingredientes,
       { nome: "", quantidade: "" }
@@ -56,11 +51,8 @@ export default function ProdutosEmbalagens() {
   }
 
   function updateIngrediente(index, field, value) {
-
     const novos = [...ingredientes];
-
     novos[index][field] = value;
-
     setIngredientes(novos);
     setCusto(calculateProductCost(novos, ingredientesBase).toFixed(2));
   }
@@ -75,11 +67,8 @@ export default function ProdutosEmbalagens() {
   }
 
   async function salvarProduto() {
-
     if (!nome || !descricao) {
-
       alert("Preencha os campos!");
-
       return;
     }
 
@@ -107,29 +96,20 @@ export default function ProdutosEmbalagens() {
     };
 
     try {
-
       await createProduto(novoProduto);
-
       alert("Produto salvo com sucesso!");
 
       setNome("");
       setDescricao("");
       setCusto("");
       setPreco("");
-
-      setIngredientes([
-        { nome: "", quantidade: "" }
-      ]);
+      setIngredientes([{ nome: "", quantidade: "" }]);
       setEmbalagensSelecionadas([]);
-
       setShowModal(false);
 
       carregarProdutos();
-
     } catch (error) {
-
       console.error(error);
-
       alert("Erro ao salvar produto");
     }
   }
@@ -147,6 +127,7 @@ export default function ProdutosEmbalagens() {
         custoProducao: Number(custo || 0),
         precoVenda: Number(preco || 0),
       };
+      
     const atualizadas = [novaEmbalagem, ...embalagens];
     setEmbalagens(atualizadas);
     saveStoredPackaging(atualizadas);
@@ -158,12 +139,32 @@ export default function ProdutosEmbalagens() {
     setShowModal(false);
   }
 
+  async function removerItem(item) {
+    const confirmacao = confirm(`Tem certeza que deseja excluir ${item.nome}?`);
+    if (!confirmacao) return;
+
+    if (view === "produtos") {
+      try {
+        await deletarProduto(item.objectId);
+        alert("Produto excluído com sucesso!");
+        carregarProdutos();
+      } catch (error) {
+        console.error(error);
+        alert("Erro ao excluir o produto.");
+      }
+    } else {
+      const idEmbalagem = item.id || item.objectId;
+      const novasEmbalagens = embalagens.filter(e => (e.id || e.objectId) !== idEmbalagem);
+      setEmbalagens(novasEmbalagens);
+      saveStoredPackaging(novasEmbalagens);
+      alert("Embalagem excluída com sucesso!");
+    }
+  }
+
   const items = view === "produtos" ? produtos : embalagens;
 
   return (
-
     <main className={styles.mainContainer}>
-
       <div className={styles.pageHeader}>
         <div>
           <h2>Produtos e Embalagens</h2>
@@ -172,83 +173,78 @@ export default function ProdutosEmbalagens() {
       </div>
 
       <div className={styles.topBar}>
-
         <div className={styles.topButtons}>
-
           <button
             className={view === "produtos" ? styles.active : ""}
             onClick={() => setView("produtos")}
           >
             Produtos
           </button>
-
           <button
             className={view === "embalagens" ? styles.active : ""}
             onClick={() => setView("embalagens")}
           >
             Embalagens
           </button>
-
         </div>
-
-        <button
-          className={styles.addButton}
-          onClick={() => setShowModal(true)}
-        >
+        <button className={styles.addButton} onClick={() => setShowModal(true)}>
           + Adicionar
         </button>
-
       </div>
 
       <div className={styles.grid}>
-
         {items.map((item) => (
-
           <div
             key={item.objectId || item.id}
             className={styles.card}
             onClick={() => {
               if (view === "produtos") router.push(`/produtos/${item.objectId}`);
             }}
+            style={{ cursor: view === "produtos" ? "pointer" : "default" }}
           >
-
-            <h3>{item.nome}</h3>
-            <p>{item.descricao || (view === "produtos" ? "Produto cadastrado" : "Embalagem cadastrada")}</p>
-
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <h3>{item.nome}</h3>
+                <p>{item.descricao || (view === "produtos" ? "Produto cadastrado" : "Embalagem cadastrada")}</p>
+              </div>
+              
+              <button
+                onClick={(e) => {
+                  e.stopPropagation(); 
+                  removerItem(item);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#ff4d4d',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  padding: '5px'
+                }}
+              >
+                Excluir
+              </button>
+            </div>
           </div>
-
         ))}
-
       </div>
 
       {showModal && (
-
         <div className={styles.overlay}>
-
           <div className={styles.modal}>
-
             <h3>{view === "produtos" ? "Novo Produto" : "Nova Embalagem"}</h3>
 
-            <input
-              placeholder="Nome"
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-            />
+            <input placeholder="Nome" value={nome} onChange={(e) => setNome(e.target.value)} />
 
             <textarea
               placeholder="Descrição"
               value={descricao}
-              onChange={(e) =>
-                setDescricao(e.target.value)
-              }
+              onChange={(e) => setDescricao(e.target.value)}
             />
 
             <div className={styles.rowInputs}>
-
               <div className={styles.inputGroup}>
-
                 <span>R$</span>
-
                 <input
                   placeholder="Custo calculado"
                   type="number"
@@ -256,50 +252,30 @@ export default function ProdutosEmbalagens() {
                   readOnly={view === "produtos"}
                   onChange={(e) => setCusto(e.target.value)}
                 />
-
               </div>
 
               <div className={styles.inputGroup}>
-
                 <span>R$</span>
-
                 <input
                   placeholder="Preço de Venda"
                   type="number"
                   value={preco}
-                  onChange={(e) =>
-                    setPreco(e.target.value)
-                  }
+                  onChange={(e) => setPreco(e.target.value)}
                 />
-
               </div>
-
             </div>
 
             {view === "produtos" && <input type="file" />}
 
             {view === "produtos" && <div className={styles.ingredientes}>
-
               <span>Ingredientes</span>
-
               {ingredientes.map((ing, index) => (
-
-                <div
-                  key={index}
-                  className={styles.ingredienteRow}
-                >
-
+                <div key={index} className={styles.ingredienteRow}>
                   <input
                     list="ingredientes-cadastrados"
                     className={styles.ingredienteNome}
                     value={ing.nome}
-                    onChange={(e) =>
-                      updateIngrediente(
-                        index,
-                        "nome",
-                        e.target.value
-                      )
-                    }
+                    onChange={(e) => updateIngrediente(index, "nome", e.target.value)}
                     placeholder="Nome do ingrediente"
                   />
                   <datalist id="ingredientes-cadastrados">
@@ -309,36 +285,20 @@ export default function ProdutosEmbalagens() {
                   </datalist>
 
                   <div className={styles.inputGroupSmall}>
-
                     <input
                       type="number"
                       value={ing.quantidade}
-                      onChange={(e) =>
-                        updateIngrediente(
-                          index,
-                          "quantidade",
-                          e.target.value
-                        )
-                      }
+                      onChange={(e) => updateIngrediente(index, "quantidade", e.target.value)}
                       placeholder="Qtd"
                     />
-
                     <span>g</span>
-
                   </div>
-
                 </div>
-
               ))}
 
-              <button
-                type="button"
-                onClick={addIngrediente}
-                className={styles.addIngrediente}
-              >
+              <button type="button" onClick={addIngrediente} className={styles.addIngrediente}>
                 + Adicionar ingrediente
               </button>
-
             </div>}
 
             {view === "produtos" && (
@@ -366,28 +326,17 @@ export default function ProdutosEmbalagens() {
             )}
 
             <div className={styles.modalActions}>
-
-              <button
-                onClick={() => setShowModal(false)}
-              >
-                Cancelar
-              </button>
-
+              <button onClick={() => setShowModal(false)}>Cancelar</button>
               <button
                 className={styles.saveButton}
                 onClick={view === "produtos" ? salvarProduto : salvarEmbalagem}
               >
                 Salvar
               </button>
-
             </div>
-
           </div>
-
         </div>
-
       )}
-
     </main>
   );
 }

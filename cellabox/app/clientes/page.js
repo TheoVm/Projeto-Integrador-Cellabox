@@ -1,18 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import styles from './page.module.css';
 
-export default function Clientes() {
-  const [clientes, setClientes] = useState([
-    { id: 1, nome: 'Felipe De Azevedo Augusto', lucroBruto: 'R$322,44', endereco: 'Avenida JJ Apolinário, 123', aniversario: '17/03/2004', historicoCliente: 'Último pedido: Quattro Sapori', produtoMaisPedido: 'Quattro Sapori' },
-    { id: 2, nome: 'Paula Cristiane de Souza', lucroBruto: 'R$134,07', endereco: 'Rua das Flores, 456', aniversario: '22/05/1995', historicoCliente: 'Última compra há 2 semanas', produtoMaisPedido: 'Pesto Classico' },
-    { id: 3, nome: 'Regina Nobrega da Silva', lucroBruto: 'R$240,67', endereco: 'Avenida Principal, 789', aniversario: '10/11/1988', historicoCliente: 'Cliente há 3 anos', produtoMaisPedido: 'Tomate Seco' },
-  ]);
+import { getClientes, createCliente, deleteCliente } from '@/services/back4app';
 
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [formData, setFormData] = useState({
+export default function Clientes() {
+  const [clientes, setClientes] = useState([]);
+  const [mostrarFormulario, setMostrarFormulario] = useState(false);
+  const [dadosFormulario, setDadosFormulario] = useState({
     nome: '',
     lucroBruto: '',
     endereco: '',
@@ -21,48 +18,81 @@ export default function Clientes() {
     produtoMaisPedido: '',
   });
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
+  useEffect(() => {
+    carregarClientes();
+  }, []);
 
-  const handleAddCliente = (e) => {
-    e.preventDefault();
-    if (formData.nome.trim()) {
-      setClientes(prev => [
-        ...prev,
-        { id: prev.length + 1, ...formData }
-      ]);
-      setFormData({
-        nome: '',
-        lucroBruto: '',
-        endereco: '',
-        aniversario: '',
-        historicoCliente: '',
-        produtoMaisPedido: '',
-      });
-      setShowAddForm(false);
+  async function carregarClientes() {
+    try {
+      const dados = await getClientes();
+      setClientes(dados);
+    } catch (erro) {
+      console.error("Erro ao buscar clientes:", erro);
     }
-  };
+  }
+
+  function atualizarFormulario(e) {
+    const { name, value } = e.target;
+    setDadosFormulario(estadoAnterior => ({ ...estadoAnterior, [name]: value }));
+  }
+
+  async function salvarNovoCliente(e) {
+    e.preventDefault();
+    
+    if (dadosFormulario.nome.trim()) {
+      try {
+        await createCliente(dadosFormulario);
+        alert("Cliente cadastrado com sucesso!");
+        
+        setDadosFormulario({
+          nome: '',
+          lucroBruto: '',
+          endereco: '',
+          aniversario: '',
+          historicoCliente: '',
+          produtoMaisPedido: '',
+        });
+        setMostrarFormulario(false);
+        carregarClientes();
+      } catch (erro) {
+        console.error(erro);
+        alert("Erro ao salvar o cliente no banco de dados.");
+      }
+    }
+  }
+
+  async function excluirCliente(id) {
+    const confirmacao = confirm("Tem certeza que deseja excluir este cliente permanentemente?");
+    if (!confirmacao) return;
+
+    try {
+      await deleteCliente(id);
+      alert("Cliente excluído com sucesso!");
+      carregarClientes(); 
+    } catch (erro) {
+      console.error(erro);
+      alert("Erro ao excluir o cliente.");
+    }
+  }
 
   return (
     <main className={styles.mainContainer}>
       <div className={styles.header}>
         <h2>Clientes</h2>
-        <button className={styles.addButton} onClick={() => setShowAddForm(!showAddForm)}>
+        <button className={styles.addButton} onClick={() => setMostrarFormulario(!mostrarFormulario)}>
           + Adicionar Cliente
         </button>
       </div>
 
-      {showAddForm && (
-        <form className={styles.form} onSubmit={handleAddCliente}>
+      {mostrarFormulario && (
+        <form className={styles.form} onSubmit={salvarNovoCliente}>
           <div className={styles.formGroup}>
             <label>Nome do Cliente:</label>
             <input
               type="text"
               name="nome"
-              value={formData.nome}
-              onChange={handleInputChange}
+              value={dadosFormulario.nome}
+              onChange={atualizarFormulario}
               required
             />
           </div>
@@ -71,8 +101,8 @@ export default function Clientes() {
             <input
               type="text"
               name="lucroBruto"
-              value={formData.lucroBruto}
-              onChange={handleInputChange}
+              value={dadosFormulario.lucroBruto}
+              onChange={atualizarFormulario}
               placeholder="R$"
             />
           </div>
@@ -81,8 +111,8 @@ export default function Clientes() {
             <input
               type="text"
               name="endereco"
-              value={formData.endereco}
-              onChange={handleInputChange}
+              value={dadosFormulario.endereco}
+              onChange={atualizarFormulario}
             />
           </div>
           <div className={styles.formGroup}>
@@ -90,8 +120,8 @@ export default function Clientes() {
             <input
               type="date"
               name="aniversario"
-              value={formData.aniversario}
-              onChange={handleInputChange}
+              value={dadosFormulario.aniversario}
+              onChange={atualizarFormulario}
             />
           </div>
           <div className={styles.formGroup}>
@@ -99,8 +129,8 @@ export default function Clientes() {
             <input
               type="text"
               name="historicoCliente"
-              value={formData.historicoCliente}
-              onChange={handleInputChange}
+              value={dadosFormulario.historicoCliente}
+              onChange={atualizarFormulario}
             />
           </div>
           <div className={styles.formGroup}>
@@ -108,13 +138,13 @@ export default function Clientes() {
             <input
               type="text"
               name="produtoMaisPedido"
-              value={formData.produtoMaisPedido}
-              onChange={handleInputChange}
+              value={dadosFormulario.produtoMaisPedido}
+              onChange={atualizarFormulario}
             />
           </div>
           <div className={styles.formButtons}>
             <button type="submit" className={styles.submitBtn}>Salvar</button>
-            <button type="button" className={styles.cancelBtn} onClick={() => setShowAddForm(false)}>Cancelar</button>
+            <button type="button" className={styles.cancelBtn} onClick={() => setMostrarFormulario(false)}>Cancelar</button>
           </div>
         </form>
       )}
@@ -136,17 +166,37 @@ export default function Clientes() {
           </tr>
         </thead>
         <tbody>
-          {clientes.map((cliente) => (
-            <tr key={cliente.id}>
-              <td>{cliente.nome}</td>
-              <td>{cliente.lucroBruto}</td>
-              <td>
-                <Link href={`/clientes/${cliente.id}`} className={styles.viewLink}>
-                  Ver Detalhes
-                </Link>
-              </td>
-            </tr>
-          ))}
+          {clientes.map((cliente) => {
+            const idCliente = cliente.objectId || cliente.id;
+            
+            return (
+              <tr key={idCliente}>
+                <td>{cliente.nome}</td>
+                <td>{cliente.lucroBruto || 'R$ 0,00'}</td>
+                <td>
+                  <Link href={`/clientes/${idCliente}`} className={styles.viewLink}>
+                    Ver Detalhes
+                  </Link>
+                  
+                  <button
+                    onClick={() => excluirCliente(idCliente)}
+                    style={{
+                      marginLeft: '15px',
+                      background: 'none',
+                      border: 'none',
+                      color: '#ff4d4d',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      fontSize: '14px',
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    Excluir
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </main>
