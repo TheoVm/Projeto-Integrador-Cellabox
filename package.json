@@ -1,0 +1,13 @@
+{
+  "name": "projeto-integrador-cellabox",
+  "private": true,
+  "workspaces": [
+    "cellabox"
+  ],
+  "scripts": {
+    "dev": "npm --workspace cellabox run dev",
+    "build": "npm --workspace cellabox run build",
+    "start": "npm --workspace cellabox run start",
+    "lint": "npm --workspace cellabox run lint"
+  }
+}
