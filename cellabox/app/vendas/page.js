@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from 'react';
-import styles from './page.module.css';
 import { getClientes, getProdutos, createPedido } from '@/services/back4app';
 import { getPackagingId } from '../utils/packaging';
+import styles from './page.module.css';
 
 export default function Vendas() {
   const [clientes, setClientes] = useState([]);
