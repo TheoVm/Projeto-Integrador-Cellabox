@@ -3,6 +3,8 @@ const REST_API_KEY = 'aCKmWhaRelefAmU4tp8pZp7FltPTyz3yzW8TGBzM';
 
 const PRODUTOS_URL = 'https://parseapi.back4app.com/classes/Produtos';
 const CLIENTES_URL = 'https://parseapi.back4app.com/classes/Clientes';
+const PEDIDOS_URL = 'https://parseapi.back4app.com/classes/Pedidos';
+const GASTOS_URL = 'https://parseapi.back4app.com/classes/Gastos';
 
 const headers = {
   'X-Parse-Application-Id': APP_ID,
@@ -34,23 +36,58 @@ export const createProduto = async (data) => {
 
 export const getProdutos = async () => {
   try {
-    const response = await fetch(
-      `${PRODUTOS_URL}?order=-createdAt`,
-      {
-        method: 'GET',
-        headers,
-      }
-    );
+    const response = await fetch(`${PRODUTOS_URL}?order=-createdAt`, {
+      method: 'GET',
+      headers,
+    });
 
     if (!response.ok) {
       throw new Error('Erro ao buscar produtos');
     }
 
     const json = await response.json();
-    return json.results;
+    return json.results || [];
   } catch (error) {
     console.error(error);
     return [];
+  }
+};
+
+export const getProduto = async (id) => {
+  try {
+    const response = await fetch(`${PRODUTOS_URL}/${id}`, {
+      method: 'GET',
+      headers,
+    });
+
+    if (!response.ok) {
+      throw new Error('Erro ao buscar produto');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+};
+
+export const updateProduto = async (id, data) => {
+  try {
+    const response = await fetch(`${PRODUTOS_URL}/${id}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error(error);
+    throw error;
   }
 };
 
@@ -58,7 +95,6 @@ export const getProdutos = async () => {
 
 export const createCliente = async (data) => {
   try {
-    console.log("Enviando cliente:", data);
     const response = await fetch(CLIENTES_URL, {
       method: 'POST',
       headers,
@@ -66,7 +102,6 @@ export const createCliente = async (data) => {
     });
 
     const result = await response.json();
-    console.log("Resposta Back4App:", result);
 
     if (!response.ok) {
       throw new Error(JSON.stringify(result));
@@ -74,40 +109,33 @@ export const createCliente = async (data) => {
 
     return result;
   } catch (error) {
-    console.error("Erro createCliente:", error);
+    console.error('Erro createCliente:', error);
     throw error;
   }
 };
 
 export const getClientes = async () => {
   try {
-    const response = await fetch(
-      `${CLIENTES_URL}?order=-createdAt`,
-      {
-        method: 'GET',
-        headers,
-      }
-    );
+    const response = await fetch(`${CLIENTES_URL}?order=-createdAt`, {
+      method: 'GET',
+      headers,
+    });
 
     const json = await response.json();
-    console.log("Clientes encontrados:", json);
     return json.results || [];
   } catch (error) {
-    console.error("Erro getClientes:", error);
+    console.error('Erro getClientes:', error);
     return [];
   }
 };
 
 export const updateCliente = async (id, data) => {
   try {
-    const response = await fetch(
-      `${CLIENTES_URL}/${id}`,
-      {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(data),
-      }
-    );
+    const response = await fetch(`${CLIENTES_URL}/${id}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(data),
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -123,13 +151,10 @@ export const updateCliente = async (id, data) => {
 
 export const deleteCliente = async (id) => {
   try {
-    const response = await fetch(
-      `${CLIENTES_URL}/${id}`,
-      {
-        method: 'DELETE',
-        headers,
-      }
-    );
+    const response = await fetch(`${CLIENTES_URL}/${id}`, {
+      method: 'DELETE',
+      headers,
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -138,7 +163,79 @@ export const deleteCliente = async (id) => {
 
     return await response.json();
   } catch (error) {
-    console.error("Erro deleteCliente:", error);
+    console.error('Erro deleteCliente:', error);
     throw error;
+  }
+};
+
+// ==================== PEDIDOS ====================
+
+export const createPedido = async (data) => {
+  try {
+    const response = await fetch(PEDIDOS_URL, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Erro ao salvar pedido: ${errorText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
+};
+
+export const getPedidos = async () => {
+  try {
+    const response = await fetch(`${PEDIDOS_URL}?order=-createdAt`, {
+      method: 'GET',
+      headers,
+    });
+    const json = await response.json();
+    return json.results || [];
+  } catch (error) {
+    console.error('Erro getPedidos:', error);
+    return [];
+  }
+};
+
+// ==================== GASTOS ====================
+
+export const createGasto = async (data) => {
+  try {
+    const response = await fetch(GASTOS_URL, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Erro ao salvar gasto: ${errorText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
+};
+
+export const getGastos = async () => {
+  try {
+    const response = await fetch(`${GASTOS_URL}?order=-createdAt`, {
+      method: 'GET',
+      headers,
+    });
+    const json = await response.json();
+    return json.results || [];
+  } catch (error) {
+    console.error('Erro getGastos:', error);
+    return [];
   }
 };

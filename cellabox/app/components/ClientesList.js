@@ -7,9 +7,7 @@ export default function ClientesList({ clients, onDelete }) {
   const lista = clients || [];
 
   const gridStyle = {
-    display: 'grid',
     gridTemplateColumns: '1fr 160px 100px',
-    alignItems: 'center',
   };
 
   return (
@@ -41,19 +39,10 @@ export default function ClientesList({ clients, onDelete }) {
             </Link>
             
 
-            <div style={{ textAlign: 'right' }}>
+            <div className={styles.actionCell}>
               <button
                 onClick={() => onDelete(c.id)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#ff4d4d',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '14px',
-                  whiteSpace: 'nowrap',
-                  padding: '12px 0' 
-                }}
+                className={styles.deleteButton}
               >
                 Excluir
               </button>

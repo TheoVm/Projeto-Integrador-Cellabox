@@ -1,43 +1,52 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import styles from './page.module.css';
 import ClientesList from '../components/ClientesList';
 import {
   createCliente,
   getClientes,
-  deleteCliente
+  deleteCliente,
+  getPedidos,
 } from '@/services/back4app';
 
 export default function Clientes() {
-
   const [showModal, setShowModal] = useState(false);
-  const [clients, setClients] = useState([]);
+  const [clientes, setClientes] = useState([]);
+  const [pedidos, setPedidos] = useState([]);
   const [nome, setNome] = useState('');
   const [idade, setIdade] = useState('');
   const [aniversario, setAniversario] = useState('');
-  const [pedidoRecente, setPedidoRecente] = useState('');
-  const [pedidoMaisRealizado, setPedidoMaisRealizado] = useState('');
-  const [receita, setReceita] = useState('');
-  const [numeroPedidos, setNumeroPedidos] = useState('');
+  const [endereco, setEndereco] = useState('');
 
   useEffect(() => {
-    carregarClientes();
+    carregarDados();
   }, []);
 
-  async function carregarClientes() {
+  async function carregarDados() {
     try {
-      const dados = await getClientes();
-      const clientesFormatados = dados.map((cliente) => ({
-        id: cliente.objectId,
-        nome: cliente.nome,
-        valor: cliente.receita || 0,
-      }));
-      setClients(clientesFormatados);
+      const [clientesData, pedidosData] = await Promise.all([getClientes(), getPedidos()]);
+      setClientes(clientesData || []);
+      setPedidos(pedidosData || []);
     } catch (error) {
       console.error(error);
     }
   }
+
+  const clients = useMemo(() => {
+    return clientes.map((cliente) => {
+      const clienteId = cliente.objectId || cliente.id;
+      const pedidosCliente = pedidos.filter((pedido) => pedido.clienteId === clienteId);
+      const receita = pedidosCliente.reduce((sum, pedido) => sum + Number(pedido.total || 0), 0);
+
+      return {
+        id: clienteId,
+        nome: cliente.nome,
+        valor: receita,
+        pedidos: pedidosCliente.length,
+      };
+    });
+  }, [clientes, pedidos]);
 
   async function removerCliente(id) {
     const confirmar = confirm("Tem certeza que deseja excluir este cliente?");
@@ -46,7 +55,7 @@ export default function Clientes() {
     try {
       await deleteCliente(id);
       alert('Cliente excluído com sucesso!');
-      await carregarClientes();
+      await carregarDados();
     } catch (error) {
       console.error(error);
       alert('Erro ao excluir cliente.');
@@ -63,27 +72,18 @@ export default function Clientes() {
       nome,
       idade: Number(idade || 0),
       aniversario,
-      pedidoRecente,
-      pedidoMaisRealizado,
-      receita: Number(receita || 0),
-      numeroPedidos: Number(numeroPedidos || 0),
+      endereco,
     };
 
-    console.log("Cliente enviado:", novoCliente);
-
     try {
-      const resultado = await createCliente(novoCliente);
-      console.log("Cliente salvo:", resultado);
+      await createCliente(novoCliente);
       alert('Cliente salvo com sucesso!');
-      await carregarClientes();
+      await carregarDados();
       setShowModal(false);
       setNome('');
       setIdade('');
       setAniversario('');
-      setPedidoRecente('');
-      setPedidoMaisRealizado('');
-      setReceita('');
-      setNumeroPedidos('');
+      setEndereco('');
     } catch (error) {
       console.error(error);
       alert('Erro ao salvar cliente');
@@ -92,10 +92,12 @@ export default function Clientes() {
 
   return (
     <main className={styles.mainContainer}>
-      <h2>Clientes</h2>
-      <p className={styles.sub}>
-        Lista de clientes cadastrados
-      </p>
+      <div className={styles.pageHeader}>
+        <div>
+          <h2>Clientes</h2>
+          <p className={styles.sub}>Cadastre dados fixos dos clientes. Receita e pedidos são calculados automaticamente.</p>
+        </div>
+      </div>
 
       <div className={styles.topBar}>
         <div />
@@ -132,32 +134,10 @@ export default function Clientes() {
               />
             </div>
             <input
-              placeholder="Pedido mais recente"
-              value={pedidoRecente}
-              onChange={(e) => setPedidoRecente(e.target.value)}
+              placeholder="Endereço"
+              value={endereco}
+              onChange={(e) => setEndereco(e.target.value)}
             />
-            <input
-              placeholder="Pedido mais realizado"
-              value={pedidoMaisRealizado}
-              onChange={(e) => setPedidoMaisRealizado(e.target.value)}
-            />
-            <div className={styles.rowInputs}>
-              <div className={styles.inputGroupSmall}>
-                <span>R$</span>
-                <input
-                  placeholder="Receita"
-                  type="number"
-                  value={receita}
-                  onChange={(e) => setReceita(e.target.value)}
-                />
-              </div>
-              <input
-                placeholder="Total de pedidos"
-                type="number"
-                value={numeroPedidos}
-                onChange={(e) => setNumeroPedidos(e.target.value)}
-              />
-            </div>
             <div className={styles.modalActions}>
               <button onClick={() => setShowModal(false)}>
                 Cancelar

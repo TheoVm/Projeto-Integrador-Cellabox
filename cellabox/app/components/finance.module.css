@@ -1,0 +1,28 @@
+.cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  box-shadow: var(--shadow);
+}
+
+.cardTitle { color: #666; font-size: 0.9rem; }
+.cardValue { font-size: 1.25rem; font-weight: 700; margin-top: 0.5rem; }
+.cardSubtitle { color: #999; font-size: 0.85rem; margin-top: 0.5rem; }
+
+.chartContainer { height: 320px; background: var(--surface); border: 1px solid var(--border); padding: 1rem; border-radius: 8px; box-shadow: var(--shadow);} 
+
+@media (max-width: 900px) {
+  .cards { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 600px) {
+  .cards { grid-template-columns: 1fr; }
+}

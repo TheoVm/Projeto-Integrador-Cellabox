@@ -8,6 +8,8 @@ import {
   createProduto,
   getProdutos,
 } from "@/services/back4app";
+import { calculateIngredientCost, calculateProductCost, getStoredIngredients } from "../utils/ingredients";
+import { getPackagingId, getStoredPackaging, saveStoredPackaging } from "../utils/packaging";
 
 export default function ProdutosEmbalagens() {
 
@@ -18,6 +20,9 @@ export default function ProdutosEmbalagens() {
   const [showModal, setShowModal] = useState(false);
 
   const [produtos, setProdutos] = useState([]);
+  const [ingredientesBase] = useState(() => getStoredIngredients());
+  const [embalagens, setEmbalagens] = useState(() => getStoredPackaging());
+  const [embalagensSelecionadas, setEmbalagensSelecionadas] = useState([]);
 
   const [nome, setNome] = useState("");
 
@@ -57,6 +62,16 @@ export default function ProdutosEmbalagens() {
     novos[index][field] = value;
 
     setIngredientes(novos);
+    setCusto(calculateProductCost(novos, ingredientesBase).toFixed(2));
+  }
+
+  function toggleEmbalagem(embalagem) {
+    const id = getPackagingId(embalagem);
+    setEmbalagensSelecionadas((atuais) => (
+      atuais.some((item) => getPackagingId(item) === id)
+        ? atuais.filter((item) => getPackagingId(item) !== id)
+        : [...atuais, embalagem]
+    ));
   }
 
   async function salvarProduto() {
@@ -68,12 +83,27 @@ export default function ProdutosEmbalagens() {
       return;
     }
 
+    const ingredientesCalculados = ingredientes
+      .filter((ingrediente) => ingrediente.nome && Number(ingrediente.quantidade || 0) > 0)
+      .map((ingrediente) => {
+        const calculo = calculateIngredientCost(ingrediente, ingredientesBase);
+        return {
+          ...ingrediente,
+          quantidade: Number(ingrediente.quantidade || 0),
+          valorKg: calculo.valorKg,
+          custo: calculo.custo,
+        };
+      });
+
+    const custoCalculado = calculateProductCost(ingredientesCalculados, ingredientesBase);
+
     const novoProduto = {
       nome,
       descricao,
-      custoProducao: Number(custo),
+      custoProducao: custoCalculado,
       precoVenda: Number(preco),
-      ingredientes,
+      ingredientes: ingredientesCalculados,
+      embalagens: embalagensSelecionadas,
     };
 
     try {
@@ -90,6 +120,7 @@ export default function ProdutosEmbalagens() {
       setIngredientes([
         { nome: "", quantidade: "" }
       ]);
+      setEmbalagensSelecionadas([]);
 
       setShowModal(false);
 
@@ -103,11 +134,42 @@ export default function ProdutosEmbalagens() {
     }
   }
 
+  function salvarEmbalagem() {
+    if (!nome) {
+      alert("Preencha o nome da embalagem!");
+      return;
+    }
+
+    const novaEmbalagem = {
+        id: String(Date.now()),
+        nome,
+        descricao,
+        custoProducao: Number(custo || 0),
+        precoVenda: Number(preco || 0),
+      };
+    const atualizadas = [novaEmbalagem, ...embalagens];
+    setEmbalagens(atualizadas);
+    saveStoredPackaging(atualizadas);
+
+    setNome("");
+    setDescricao("");
+    setCusto("");
+    setPreco("");
+    setShowModal(false);
+  }
+
+  const items = view === "produtos" ? produtos : embalagens;
+
   return (
 
     <main className={styles.mainContainer}>
 
-      <h2>Produtos e Embalagens</h2>
+      <div className={styles.pageHeader}>
+        <div>
+          <h2>Produtos e Embalagens</h2>
+          <p>Organize produtos vendidos e materiais usados na entrega.</p>
+        </div>
+      </div>
 
       <div className={styles.topBar}>
 
@@ -140,17 +202,18 @@ export default function ProdutosEmbalagens() {
 
       <div className={styles.grid}>
 
-        {produtos.map((item) => (
+        {items.map((item) => (
 
           <div
-            key={item.objectId}
+            key={item.objectId || item.id}
             className={styles.card}
-            onClick={() =>
-              router.push(`/${view}/${item.objectId}`)
-            }
+            onClick={() => {
+              if (view === "produtos") router.push(`/produtos/${item.objectId}`);
+            }}
           >
 
             <h3>{item.nome}</h3>
+            <p>{item.descricao || (view === "produtos" ? "Produto cadastrado" : "Embalagem cadastrada")}</p>
 
           </div>
 
@@ -164,7 +227,7 @@ export default function ProdutosEmbalagens() {
 
           <div className={styles.modal}>
 
-            <h3>Novo Produto</h3>
+            <h3>{view === "produtos" ? "Novo Produto" : "Nova Embalagem"}</h3>
 
             <input
               placeholder="Nome"
@@ -187,12 +250,11 @@ export default function ProdutosEmbalagens() {
                 <span>R$</span>
 
                 <input
-                  placeholder="Custo de Produção"
+                  placeholder="Custo calculado"
                   type="number"
                   value={custo}
-                  onChange={(e) =>
-                    setCusto(e.target.value)
-                  }
+                  readOnly={view === "produtos"}
+                  onChange={(e) => setCusto(e.target.value)}
                 />
 
               </div>
@@ -214,9 +276,9 @@ export default function ProdutosEmbalagens() {
 
             </div>
 
-            <input type="file" />
+            {view === "produtos" && <input type="file" />}
 
-            <div className={styles.ingredientes}>
+            {view === "produtos" && <div className={styles.ingredientes}>
 
               <span>Ingredientes</span>
 
@@ -228,6 +290,7 @@ export default function ProdutosEmbalagens() {
                 >
 
                   <input
+                    list="ingredientes-cadastrados"
                     className={styles.ingredienteNome}
                     value={ing.nome}
                     onChange={(e) =>
@@ -239,6 +302,11 @@ export default function ProdutosEmbalagens() {
                     }
                     placeholder="Nome do ingrediente"
                   />
+                  <datalist id="ingredientes-cadastrados">
+                    {ingredientesBase.map((item) => (
+                      <option key={item.id || item.nome} value={item.nome} />
+                    ))}
+                  </datalist>
 
                   <div className={styles.inputGroupSmall}>
 
@@ -271,7 +339,31 @@ export default function ProdutosEmbalagens() {
                 + Adicionar ingrediente
               </button>
 
-            </div>
+            </div>}
+
+            {view === "produtos" && (
+              <div className={styles.embalagensPicker}>
+                <span>Embalagens disponíveis</span>
+                <div className={styles.optionGrid}>
+                  {embalagens.map((embalagem) => {
+                    const id = getPackagingId(embalagem);
+                    const checked = embalagensSelecionadas.some((item) => getPackagingId(item) === id);
+
+                    return (
+                      <label key={id} className={checked ? styles.optionActive : styles.option}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleEmbalagem(embalagem)}
+                        />
+                        <span>{embalagem.nome}</span>
+                        <small>R$ {Number(embalagem.custoProducao || 0).toFixed(2)}</small>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className={styles.modalActions}>
 
@@ -283,7 +375,7 @@ export default function ProdutosEmbalagens() {
 
               <button
                 className={styles.saveButton}
-                onClick={salvarProduto}
+                onClick={view === "produtos" ? salvarProduto : salvarEmbalagem}
               >
                 Salvar
               </button>
