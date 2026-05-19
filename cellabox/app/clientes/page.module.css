@@ -4,13 +4,162 @@
   margin: 0 auto;
 }
 
-.mainContainer h2 {
-  color: #333;
-  margin-bottom: 1rem;
-  font-size: 1.6rem;
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
 }
 
-.mainContainer p {
-  color: #666;
-  line-height: 1.6;
+.header h2 {
+  color: #333;
+  font-size: 1.8rem;
+  margin: 0;
+}
+
+.addButton {
+  padding: 0.75rem 1.5rem;
+  background-color: #8B7D6F;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: background-color 0.3s;
+}
+
+.addButton:hover {
+  background-color: #6F6A5F;
+}
+
+.form {
+  background-color: #F5F0E8;
+  padding: 2rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+  border: 1px solid #ddd;
+}
+
+.formGroup {
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.formGroup label {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #333;
+}
+
+.formGroup input {
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+  background-color: white;
+}
+
+.formGroup input:focus {
+  outline: none;
+  border-color: #8B7D6F;
+  box-shadow: 0 0 5px rgba(139, 125, 111, 0.3);
+}
+
+.formButtons {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.submitBtn, .cancelBtn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: background-color 0.3s;
+}
+
+.submitBtn {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.submitBtn:hover {
+  background-color: #45a049;
+}
+
+.cancelBtn {
+  background-color: #ddd;
+  color: #333;
+}
+
+.cancelBtn:hover {
+  background-color: #bbb;
+}
+
+.searchContainer {
+  margin-bottom: 2rem;
+}
+
+.searchInput {
+  width: 100%;
+  max-width: 300px;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+  background-color: #F5F0E8;
+}
+
+.searchInput::placeholder {
+  color: #999;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: #E8DFD5;
+  border: 1px solid #999;
+}
+
+.table thead {
+  background-color: #C9B9AD;
+}
+
+.table th {
+  padding: 1rem;
+  text-align: center;
+  border: 1px solid #999;
+  font-weight: 600;
+  color: #333;
+}
+
+.table td {
+  padding: 1rem;
+  text-align: center;
+  border: 1px solid #999;
+  color: #333;
+}
+
+.table tbody tr:hover {
+  background-color: #DED4CA;
+}
+
+.viewLink {
+  color: #8B7D6F;
+  text-decoration: none;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  background-color: #DFD7CF;
+  border-radius: 4px;
+  transition: background-color 0.3s;
+  display: inline-block;
+}
+
+.viewLink:hover {
+  background-color: #c9c0b8;
 }
