@@ -1,1 +1,62 @@
+:root {
+  --background: #faf7f1;
+  --surface: #ffffff;
+  --surface-strong: #f1e7da;
+  --surface-soft: #f8f1e8;
+  --text: #261f1a;
+  --muted: #6f6259;
+  --border: #e3d8cc;
+  --accent: #8f5d43;
+  --accent-strong: #6f422e;
+  --success: #2e7d54;
+  --danger: #b54545;
+  --shadow: 0 16px 38px rgba(63, 45, 31, 0.08);
+}
 
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  background:
+    linear-gradient(180deg, rgba(241, 231, 218, 0.62), rgba(250, 247, 241, 0) 360px),
+    var(--background);
+  color: var(--text);
+  font-family: var(--font-geist-sans), Arial, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  border: 0;
+}
+
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+input,
+select,
+textarea {
+  color: var(--text);
+}
+
+a {
+  color: inherit;
+}

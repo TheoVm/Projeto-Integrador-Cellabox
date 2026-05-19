@@ -1,57 +1,122 @@
-import styles from "./page.module.css";
+'use client';
 
-export default function ProdutoIndividual({ params }) {
-  const produto = {
-    nome: "Quattro Sapori",
-    descricao:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
-    custo: 67.34,
-    lucro: 67.34,
-    ingredientes: [
-      { nome: "Alface", qtd: "50g", valor: "R$2,50" },
-      { nome: "Tomate", qtd: "65g", valor: "R$6,15" },
-      { nome: "Sal", qtd: "200g", valor: "R$4,00" },
-      { nome: "Farinha", qtd: "150g", valor: "R$15,00" },
-    ],
-    embalagens: [
-      { nome: "Pequena", valor: "R$5,00" },
-      { nome: "Média", valor: "R$10,00" },
-      { nome: "Grande", valor: "R$15,00" },
-    ],
-  };
+import { useEffect, useMemo, useState } from 'react';
+import { useParams } from 'next/navigation';
+import { getProduto, updateProduto } from '@/services/back4app';
+import { calculateIngredientCost, calculateProductCost, getStoredIngredients } from '../../utils/ingredients';
+import { getPackagingId, getStoredPackaging } from '../../utils/packaging';
+import styles from './page.module.css';
+
+export default function ProdutoIndividual() {
+  const { id } = useParams();
+  const [produto, setProduto] = useState(null);
+  const [ingredientesBase, setIngredientesBase] = useState([]);
+  const [embalagensBase, setEmbalagensBase] = useState([]);
+  const [savingPackaging, setSavingPackaging] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function carregarProduto() {
+      setLoading(true);
+      setIngredientesBase(getStoredIngredients());
+      setEmbalagensBase(getStoredPackaging());
+      const data = await getProduto(id);
+      setProduto(data);
+      setLoading(false);
+    }
+
+    if (id) carregarProduto();
+  }, [id]);
+
+  const ingredientes = useMemo(() => produto?.ingredientes || [], [produto]);
+  const embalagens = useMemo(() => produto?.embalagens || [], [produto]);
+  const custoProduto = useMemo(() => {
+    return calculateProductCost(ingredientes, ingredientesBase);
+  }, [ingredientes, ingredientesBase]);
+
+  const lucro = useMemo(() => {
+    if (!produto) return 0;
+    return Number(produto.precoVenda || produto.preco || 0) - custoProduto;
+  }, [produto, custoProduto]);
+
+  const embalagensIds = useMemo(() => {
+    return new Set(embalagens.map((embalagem) => getPackagingId(embalagem)));
+  }, [embalagens]);
+
+  const embalagensDisponiveis = useMemo(() => {
+    return embalagensBase.filter((embalagem) => !embalagensIds.has(getPackagingId(embalagem)));
+  }, [embalagensBase, embalagensIds]);
+
+  async function salvarEmbalagens(nextEmbalagens) {
+    setSavingPackaging(true);
+    try {
+      await updateProduto(id, { embalagens: nextEmbalagens });
+      setProduto((current) => ({ ...current, embalagens: nextEmbalagens }));
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao atualizar embalagens do produto');
+    } finally {
+      setSavingPackaging(false);
+    }
+  }
+
+  function adicionarEmbalagem(embalagemId) {
+    const embalagem = embalagensBase.find((item) => getPackagingId(item) === embalagemId);
+    if (!embalagem) return;
+    salvarEmbalagens([...embalagens, embalagem]);
+  }
+
+  function removerEmbalagem(embalagemId) {
+    salvarEmbalagens(embalagens.filter((item) => getPackagingId(item) !== embalagemId));
+  }
+
+  if (loading) {
+    return (
+      <main className={styles.mainContainer}>
+        <div className={styles.card}>Carregando produto...</div>
+      </main>
+    );
+  }
+
+  if (!produto) {
+    return (
+      <main className={styles.mainContainer}>
+        <div className={styles.card}>Produto não encontrado.</div>
+      </main>
+    );
+  }
 
   return (
     <main className={styles.mainContainer}>
       <div className={styles.card}>
-        
         <div className={styles.topSection}>
-          <img
-            src="https://picsum.photos/200"
-            alt="produto"
-            className={styles.image}
-          />
+          <div className={styles.imagePlaceholder}>{produto.nome?.slice(0, 1) || 'P'}</div>
 
           <div className={styles.info}>
             <h1>{produto.nome}</h1>
             <hr />
-            <p>{produto.descricao}</p>
+            <p>{produto.descricao || 'Sem descrição cadastrada.'}</p>
           </div>
         </div>
 
         <div className={styles.metrics}>
           <div>
             <span>Custo médio</span>
-            <strong>R$ {produto.custo.toFixed(2)}</strong>
+            <strong>R$ {custoProduto.toFixed(2)}</strong>
+          </div>
+
+          <div>
+            <span>Preço de venda</span>
+            <strong>R$ {Number(produto.precoVenda || produto.preco || 0).toFixed(2)}</strong>
           </div>
 
           <div>
             <span>Lucro médio</span>
-            <strong>R$ {produto.lucro.toFixed(2)}</strong>
+            <strong>R$ {lucro.toFixed(2)}</strong>
           </div>
         </div>
 
         <div className={styles.bottomRow}>
-          
           <div className={styles.sectionWrapper}>
             <h3 className={styles.sectionTitle}>Ingredientes</h3>
 
@@ -60,16 +125,22 @@ export default function ProdutoIndividual({ params }) {
                 <div className={styles.rowHeader3}>
                   <span>Ingrediente</span>
                   <span>Qtd</span>
-                  <span>Valor</span>
+                  <span>Custo</span>
                 </div>
 
-                {produto.ingredientes.map((i, index) => (
-                  <div key={index} className={styles.row3}>
-                    <span>{i.nome}</span>
-                    <span>{i.qtd}</span>
-                    <span>{i.valor}</span>
-                  </div>
-                ))}
+                {ingredientes.length === 0 ? (
+                  <div className={styles.empty}>Nenhum ingrediente cadastrado.</div>
+                ) : ingredientes.map((ingrediente, index) => {
+                  const calculo = calculateIngredientCost(ingrediente, ingredientesBase);
+
+                  return (
+                    <div key={`${ingrediente.nome}-${index}`} className={styles.row3}>
+                      <span>{ingrediente.nome || '-'}</span>
+                      <span>{ingrediente.quantidade || '-'}g</span>
+                      <span>R$ {calculo.custo.toFixed(2)}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -78,22 +149,47 @@ export default function ProdutoIndividual({ params }) {
             <h3 className={styles.sectionTitle}>Embalagens</h3>
 
             <div className={styles.sectionSmall}>
+              <div className={styles.packageControls}>
+                <select
+                  value=""
+                  onChange={(event) => adicionarEmbalagem(event.target.value)}
+                  disabled={savingPackaging || embalagensDisponiveis.length === 0}
+                >
+                  <option value="">Adicionar embalagem</option>
+                  {embalagensDisponiveis.map((embalagem) => (
+                    <option key={getPackagingId(embalagem)} value={getPackagingId(embalagem)}>
+                      {embalagem.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className={styles.table2}>
                 <div className={styles.rowHeader2}>
                   <span>Tipo</span>
                   <span>Valor</span>
                 </div>
 
-                {produto.embalagens.map((e, index) => (
-                  <div key={index} className={styles.row2}>
-                    <span>{e.nome}</span>
-                    <span>{e.valor}</span>
+                {embalagens.length === 0 ? (
+                  <div className={styles.empty}>Nenhuma embalagem vinculada.</div>
+                ) : embalagens.map((embalagem, index) => (
+                  <div key={`${embalagem.nome}-${index}`} className={styles.row2}>
+                    <span>{embalagem.nome || '-'}</span>
+                    <span>
+                      R$ {Number(embalagem.custoProducao || embalagem.valor || 0).toFixed(2)}
+                      <button
+                        className={styles.removePackage}
+                        onClick={() => removerEmbalagem(getPackagingId(embalagem))}
+                        disabled={savingPackaging}
+                      >
+                        Remover
+                      </button>
+                    </span>
                   </div>
                 ))}
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </main>

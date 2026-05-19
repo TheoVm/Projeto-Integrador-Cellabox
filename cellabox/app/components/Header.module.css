@@ -1,40 +1,68 @@
 .header {
-  background-color: #BFAE9E;
+  position: sticky;
+  top: 0;
+  z-index: 40;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.5rem 0;
-  border-bottom: 2px solid #ddd;
-  height: 83px;
+  gap: 1.5rem;
+  min-height: 76px;
+  padding: 0.6rem 2rem;
+  background: rgba(250, 247, 241, 0.94);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
 .logo {
-  width: 85px;
-  height: 83px;
-}
-
-.navContainer {
-  flex: 1;
-  display: flex;
-  justify-content: center;
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
 }
 
 .nav {
   display: flex;
-  gap: 2rem;
+  justify-content: flex-end;
+  gap: 0.45rem;
   flex-wrap: wrap;
 }
 
 .nav a {
-  padding: 0.5rem 1rem;
-  background-color: #DFD7CF;
-  color: #333;
+  padding: 0.55rem 0.85rem;
+  color: var(--muted);
   text-decoration: none;
-  border-radius: 4px;
-  transition: background-color 0.3s;
-  font-weight: 500;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  font-size: 0.93rem;
+  font-weight: 650;
 }
 
-.nav a:hover {
-  background-color: #c9c0b8;
+.nav a:hover,
+.nav a.active {
+  background: var(--surface-strong);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+@media (max-width: 860px) {
+  .header {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 0.75rem 1rem;
+  }
+
+  .nav {
+    justify-content: flex-start;
+  }
 }
