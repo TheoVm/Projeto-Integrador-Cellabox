@@ -71,6 +71,26 @@
   align-items: start;
 }
 
+.chartArea {
+  min-width: 0;
+}
+
+.chartHeader {
+  margin-bottom: 0.75rem;
+}
+
+.chartHeader h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.chartHeader p {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 .sideArea {
   min-width: 0;
 }

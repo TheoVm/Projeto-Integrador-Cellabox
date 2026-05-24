@@ -31,7 +31,7 @@ export default function IngredientesList({ initial, onChange, onSave, onDelete }
           <div key={it.id} className={`${styles.row} ${styles.rowData}`} style={gridStyle}>
             <span className={styles.left}>{it.nome}</span>
 
-            <div className={styles.rightInput} style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '5px' }}>
+            <div className={styles.rightInput}>
               <input
                 className={styles.input}
                 type="number"
@@ -39,23 +39,14 @@ export default function IngredientesList({ initial, onChange, onSave, onDelete }
                 value={it.valor}
                 onChange={(e) => handleChange(it.id, e.target.value)}
                 onBlur={(e) => onSave?.(it.id, e.target.value)} 
-                style={{ width: '80px' }}
               />
               <span className={styles.unit}>R$ /kg</span>
             </div>
 
-            <div style={{ textAlign: 'right', paddingRight: '10px' }}>
+            <div className={styles.actionCell}>
               <button
                 onClick={() => onDelete?.(it.id)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#ff4d4d',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '14px',
-                  whiteSpace: 'nowrap'
-                }}
+                className={styles.deleteButton}
               >
                 Excluir
               </button>

@@ -5,9 +5,11 @@ import { useParams } from 'next/navigation';
 import { getProduto, updateProduto } from '@/services/back4app';
 import { calculateIngredientCost, calculateProductCost, getStoredIngredients } from '../../utils/ingredients';
 import { getPackagingId, getStoredPackaging } from '../../utils/packaging';
+import { useToast } from '../../components/ToastProvider';
 import styles from './page.module.css';
 
 export default function ProdutoIndividual() {
+  const toast = useToast();
   const { id } = useParams();
   
   const [produto, setProduto] = useState(null);
@@ -16,7 +18,6 @@ export default function ProdutoIndividual() {
   const [savingPackaging, setSavingPackaging] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Estados de edição do cabeçalho
   const [editando, setEditando] = useState(false);
   const [nomeEditado, setNomeEditado] = useState('');
   const [descricaoEditada, setDescricaoEditada] = useState('');
@@ -73,10 +74,10 @@ export default function ProdutoIndividual() {
       
       setProduto({ ...produto, ...dadosAtualizados });
       setEditando(false);
-      alert("Informações do produto atualizadas!");
+      toast.success("Informações do produto atualizadas!");
     } catch (error) {
       console.error(error);
-      alert('Erro ao atualizar produto.');
+      toast.error('Erro ao atualizar produto.');
     }
   }
 
@@ -87,7 +88,7 @@ export default function ProdutoIndividual() {
       setProduto((current) => ({ ...current, embalagens: nextEmbalagens }));
     } catch (error) {
       console.error(error);
-      alert('Erro ao atualizar embalagens do produto');
+      toast.error('Erro ao atualizar embalagens do produto');
     } finally {
       setSavingPackaging(false);
     }

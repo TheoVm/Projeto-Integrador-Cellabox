@@ -11,8 +11,10 @@ import {
 } from "@/services/back4app";
 import { calculateIngredientCost, calculateProductCost, getStoredIngredients } from "../utils/ingredients";
 import { getPackagingId, getStoredPackaging, saveStoredPackaging } from "../utils/packaging";
+import { useToast } from "../components/ToastProvider";
 
 export default function ProdutosEmbalagens() {
+  const toast = useToast();
 
   const router = useRouter();
 
@@ -68,7 +70,7 @@ export default function ProdutosEmbalagens() {
 
   async function salvarProduto() {
     if (!nome || !descricao) {
-      alert("Preencha os campos!");
+      toast.error("Preencha nome e descrição.", "Validação");
       return;
     }
 
@@ -97,7 +99,7 @@ export default function ProdutosEmbalagens() {
 
     try {
       await createProduto(novoProduto);
-      alert("Produto salvo com sucesso!");
+      toast.success("Produto salvo com sucesso!");
 
       setNome("");
       setDescricao("");
@@ -110,13 +112,13 @@ export default function ProdutosEmbalagens() {
       carregarProdutos();
     } catch (error) {
       console.error(error);
-      alert("Erro ao salvar produto");
+      toast.error("Erro ao salvar produto");
     }
   }
 
   function salvarEmbalagem() {
     if (!nome) {
-      alert("Preencha o nome da embalagem!");
+      toast.error("Preencha o nome da embalagem.", "Validação");
       return;
     }
 
@@ -131,6 +133,7 @@ export default function ProdutosEmbalagens() {
     const atualizadas = [novaEmbalagem, ...embalagens];
     setEmbalagens(atualizadas);
     saveStoredPackaging(atualizadas);
+    toast.success("Embalagem salva com sucesso!");
 
     setNome("");
     setDescricao("");
@@ -140,24 +143,21 @@ export default function ProdutosEmbalagens() {
   }
 
   async function removerItem(item) {
-    const confirmacao = confirm(`Tem certeza que deseja excluir ${item.nome}?`);
-    if (!confirmacao) return;
-
     if (view === "produtos") {
       try {
         await deletarProduto(item.objectId);
-        alert("Produto excluído com sucesso!");
+        toast.success("Produto excluído com sucesso!");
         carregarProdutos();
       } catch (error) {
         console.error(error);
-        alert("Erro ao excluir o produto.");
+        toast.error("Erro ao excluir o produto.");
       }
     } else {
       const idEmbalagem = item.id || item.objectId;
       const novasEmbalagens = embalagens.filter(e => (e.id || e.objectId) !== idEmbalagem);
       setEmbalagens(novasEmbalagens);
       saveStoredPackaging(novasEmbalagens);
-      alert("Embalagem excluída com sucesso!");
+      toast.success("Embalagem excluída com sucesso!");
     }
   }
 

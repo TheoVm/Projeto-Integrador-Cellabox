@@ -41,6 +41,14 @@ export default function FinanceChart({ series }) {
               tension: 0.3,
               fill: true,
             },
+            {
+              label: 'Lucro',
+              data: (series || []).map((s) => s.lucro || 0),
+              borderColor: '#8f5d43',
+              backgroundColor: 'rgba(143,93,67,0.08)',
+              tension: 0.3,
+              fill: false,
+            },
           ],
         };
 
@@ -56,7 +64,14 @@ export default function FinanceChart({ series }) {
           options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { position: 'top' } },
+            plugins: {
+              legend: { position: 'top' },
+              tooltip: {
+                callbacks: {
+                  label: (context) => `${context.dataset.label}: R$ ${Number(context.raw || 0).toFixed(2)}`,
+                },
+              },
+            },
             scales: { x: { grid: { display: false } }, y: { grid: { color: '#f4f4f4' } } },
           },
         });

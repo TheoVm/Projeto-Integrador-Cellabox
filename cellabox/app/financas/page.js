@@ -7,6 +7,7 @@ import {
   getPedidos,
   getGastos,
   getProdutos,
+  getIngredientes,
   createGasto,
 } from '@/services/back4app';
 
@@ -15,110 +16,104 @@ import FinanceChart from '../components/FinanceChart';
 import ExpenseTable from '../components/ExpenseTable';
 import compStyles from '../components/finance.module.css';
 import pageStyles from './page.module.css';
-import { calculateProductCost, getStoredIngredients } from '../utils/ingredients';
+import { buildMonthlyFinanceSeries, calculateSoldItemCost } from '../utils/finance';
+import { useToast } from '../components/ToastProvider';
 
 export default function Financas() {
+  const toast = useToast();
   const [pedidos, setPedidos] = useState([]);
   const [gastos, setGastos] = useState([]);
   const [produtos, setProdutos] = useState([]);
   const [ingredientesBase, setIngredientesBase] = useState([]);
-
   const [loading, setLoading] = useState(false);
-
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [expenseNome, setExpenseNome] = useState('');
   const [expenseDescricao, setExpenseDescricao] = useState('');
   const [expenseValor, setExpenseValor] = useState('');
 
-  
-
   useEffect(() => {
     carregarTudo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function carregarTudo() {
     setLoading(true);
-    setIngredientesBase(getStoredIngredients());
-    const [p, g, pr] = await Promise.all([getPedidos(), getGastos(), getProdutos()]);
-    setPedidos(p || []);
-    setGastos(g || []);
-    setProdutos(pr || []);
-    setLoading(false);
+    try {
+      const [pedidosData, gastosData, produtosData, ingredientesData] = await Promise.all([
+        getPedidos(),
+        getGastos(),
+        getProdutos(),
+        getIngredientes(),
+      ]);
+
+      setPedidos(pedidosData || []);
+      setGastos(gastosData || []);
+      setProdutos(produtosData || []);
+      setIngredientesBase((ingredientesData || []).map((item) => ({
+        id: item.objectId || item.id,
+        nome: item.nome,
+        valor: Number(item.valor || 0),
+      })));
+    } catch (error) {
+      console.error(error);
+      toast.error('Não foi possível carregar os dados financeiros.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   const produtosMap = useMemo(() => {
-    const m = {};
-    (produtos || []).forEach((p) => { m[p.objectId || p.id] = p; });
-    return m;
+    const map = {};
+    (produtos || []).forEach((produto) => {
+      map[produto.objectId || produto.id] = produto;
+    });
+    return map;
   }, [produtos]);
 
   const receitaTotal = useMemo(() => {
-    return (pedidos || []).reduce((sum, ped) => {
-      const t = ped.total || ped.valorTotal || ped.totalPedido || 0;
-      return sum + Number(t || 0);
-    }, 0);
+    return (pedidos || []).reduce((sum, pedido) => (
+      sum + Number(pedido.total || pedido.valorTotal || pedido.totalPedido || 0)
+    ), 0);
   }, [pedidos]);
 
   const gastosTotais = useMemo(() => {
-    return (gastos || []).reduce((sum, g) => sum + Number(g.valor || g.value || 0), 0);
+    return (gastos || []).reduce((sum, gasto) => sum + Number(gasto.valor || gasto.value || 0), 0);
   }, [gastos]);
 
   const custoProdutos = useMemo(() => {
-    // calcula custo com base no custoProducao dos produtos
-    return (pedidos || []).reduce((sum, ped) => {
-      const items = ped.items || [];
-      if (!items.length) return sum;
-      const parcial = items.reduce((s, it) => {
-        const prod = produtosMap[it.productId || it.produtoId || it.id];
-        const custo = prod
-          ? calculateProductCost(prod.ingredientes || [], ingredientesBase) || Number(prod.custoProducao || prod.custo || 0)
-          : 0;
-        const embalagemCusto = Number(it.embalagemCusto || 0);
-        return s + (custo + embalagemCusto) * Number(it.quantidade || it.qtd || 1);
-      }, 0);
-      return sum + parcial;
+    return (pedidos || []).reduce((sum, pedido) => {
+      const items = pedido.items || [];
+      return sum + items.reduce((subtotal, item) => (
+        subtotal + calculateSoldItemCost(item, produtosMap, ingredientesBase)
+      ), 0);
     }, 0);
   }, [pedidos, produtosMap, ingredientesBase]);
 
   const lucroTotal = receitaTotal - gastosTotais - custoProdutos;
 
   const series = useMemo(() => {
-    const map = {};
-    function keyFrom(dateStr) {
-      const d = new Date(dateStr);
-      const m = d.getMonth() + 1;
-      const y = d.getFullYear();
-      return `${y}-${String(m).padStart(2,'0')}`;
-    }
-
-    (pedidos || []).forEach((p) => {
-      const k = keyFrom(p.createdAt || p.date || new Date());
-      map[k] = map[k] || { receita: 0, gastos: 0 };
-      map[k].receita += Number(p.total || p.valorTotal || 0);
-    });
-
-    (gastos || []).forEach((g) => {
-      const k = keyFrom(g.createdAt || g.date || new Date());
-      map[k] = map[k] || { receita: 0, gastos: 0 };
-      map[k].gastos += Number(g.valor || g.value || 0);
-    });
-
-    const keys = Object.keys(map).sort();
-    return keys.map((k) => ({ label: k, receita: map[k].receita, gastos: map[k].gastos }));
-  }, [pedidos, gastos]);
+    return buildMonthlyFinanceSeries({ pedidos, gastos, produtosMap, ingredientesBase });
+  }, [pedidos, gastos, produtosMap, ingredientesBase]);
 
   async function handleAddExpense() {
-    if (!expenseNome || !expenseValor) return alert('Preencha nome e valor');
+    if (!expenseNome || !expenseValor || Number(expenseValor) <= 0) {
+      toast.error('Preencha nome e valor positivo para o gasto.', 'Validação');
+      return;
+    }
+
     try {
       await createGasto({ nome: expenseNome, descricao: expenseDescricao, valor: Number(expenseValor) });
-      setExpenseNome(''); setExpenseDescricao(''); setExpenseValor(''); setShowExpenseModal(false);
-      carregarTudo();
-    } catch (e) {
-      console.error(e); alert('Erro ao salvar gasto');
+      setExpenseNome('');
+      setExpenseDescricao('');
+      setExpenseValor('');
+      setShowExpenseModal(false);
+      await carregarTudo();
+      toast.success('Gasto adicionado com sucesso.');
+    } catch (error) {
+      console.error(error);
+      toast.error('Erro ao salvar gasto.');
     }
   }
-
-  
 
   return (
     <main className={styles.mainContainer}>
@@ -136,8 +131,13 @@ export default function Financas() {
         <FinancialCard title="Lucro Total" value={lucroTotal} />
         <FinancialCard title="Quantidade de Pedidos" value={pedidos.length} subtitle={`${pedidos.length} pedidos`} format="number" />
       </div>
+
       <div className={pageStyles.layoutGrid}>
         <div className={pageStyles.chartArea}>
+          <div className={pageStyles.chartHeader}>
+            <h3>Histórico financeiro mensal</h3>
+            <p>Receita, gastos e lucro dos últimos meses até o mês atual.</p>
+          </div>
           <FinanceChart series={series} />
         </div>
 
@@ -149,7 +149,7 @@ export default function Financas() {
             </div>
           </div>
 
-          <ExpenseTable items={gastos.slice(0,8)} />
+          <ExpenseTable items={gastos.slice(0, 8)} />
         </aside>
       </div>
 
@@ -157,11 +157,11 @@ export default function Financas() {
         <div className={styles.overlay}>
           <div className={styles.modal}>
             <h3>Novo Gasto</h3>
-            <input placeholder="Nome" value={expenseNome} onChange={(e)=>setExpenseNome(e.target.value)} />
-            <input placeholder="Descrição" value={expenseDescricao} onChange={(e)=>setExpenseDescricao(e.target.value)} />
+            <input placeholder="Nome" value={expenseNome} onChange={(e) => setExpenseNome(e.target.value)} />
+            <input placeholder="Descrição" value={expenseDescricao} onChange={(e) => setExpenseDescricao(e.target.value)} />
             <div className={styles.inputGroup}>
               <span>R$</span>
-              <input type="number" value={expenseValor} onChange={(e)=>setExpenseValor(e.target.value)} />
+              <input type="number" value={expenseValor} onChange={(e) => setExpenseValor(e.target.value)} />
             </div>
 
             <div className={styles.modalActions}>
@@ -171,9 +171,6 @@ export default function Financas() {
           </div>
         </div>
       )}
-
-      
-
     </main>
   );
 }

@@ -4,8 +4,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { getClientes, getProdutos, createPedido } from '@/services/back4app';
 import { getPackagingId } from '../utils/packaging';
 import styles from '../vendas/page.module.css';
+import { useToast } from './ToastProvider';
 
 export default function VendasClient() {
+  const toast = useToast();
   const [clientes, setClientes] = useState([]);
   const [produtos, setProdutos] = useState([]);
   const [cliente, setCliente] = useState('');
@@ -59,16 +61,24 @@ export default function VendasClient() {
   }, [items, produtosMap]);
 
   async function confirmar() {
-    if (!cliente) return alert('Selecione um cliente');
-    if (!items.length) return alert('Adicione pelo menos um item');
+    if (!cliente) {
+      toast.error('Selecione um cliente.', 'Validação');
+      return;
+    }
+    if (!items.length) {
+      toast.error('Adicione pelo menos um item.', 'Validação');
+      return;
+    }
     if (items.some((item) => !item.productId || Number(item.quantidade || 0) <= 0)) {
-      return alert('Selecione os produtos e informe quantidades válidas');
+      toast.error('Selecione os produtos e informe quantidades válidas.', 'Validação');
+      return;
     }
     if (items.some((item) => {
       const produto = produtosMap[item.productId] || {};
       return (produto.embalagens || []).length > 0 && !item.embalagemId;
     })) {
-      return alert('Escolha a embalagem de cada produto');
+      toast.error('Escolha a embalagem de cada produto.', 'Validação');
+      return;
     }
 
     const clienteSelecionado = clientes.find((c) => (c.objectId || c.id) === cliente);
@@ -94,13 +104,13 @@ export default function VendasClient() {
 
     try {
       await createPedido(payload);
-      alert('Pedido criado com sucesso');
+      toast.success('Pedido criado com sucesso.');
       setCliente('');
       setItems([{ productId: '', embalagemId: '', quantidade: 1 }]);
       carregar();
     } catch (error) {
       console.error(error);
-      alert('Erro ao criar pedido');
+      toast.error('Erro ao criar pedido.');
     }
   }
 
