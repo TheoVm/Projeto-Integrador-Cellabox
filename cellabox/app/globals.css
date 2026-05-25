@@ -57,6 +57,12 @@ textarea {
   color: var(--text);
 }
 
+textarea {
+  resize: none;
+  field-sizing: content;
+  overflow-y: hidden;
+}
+
 a {
   color: inherit;
 }

@@ -1,99 +1,229 @@
 .mainContainer {
-  padding: 2rem;
-  max-width: 1200px;
+  width: min(1180px, calc(100% - 2rem));
   margin: 0 auto;
+  padding: 2rem 0 3rem;
 }
 
-.backButton {
-  margin-bottom: 2rem;
-}
-
-.backButton a {
+.backLink {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 50px;
-  height: 50px;
-  background-color: #C9B9AD;
-  color: #333;
-  text-decoration: none;
+  min-height: 38px;
+  margin-bottom: 1rem;
+  padding: 0.55rem 0.75rem;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  font-weight: 600;
-  transition: background-color 0.3s;
+  color: var(--text);
+  font-weight: 750;
+  text-decoration: none;
 }
 
-.backButton a:hover {
-  background-color: #BFAE9E;
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 1.25rem;
 }
 
-.detailCard {
-  background-color: #E8DFD5;
-  border: 1px solid #999;
-  border-radius: 4px;
-  overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.cardHeader {
-  background-color: #8B7D6F;
-  color: white;
-  padding: 1.5rem;
+.hero {
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
-  align-items: center;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
 }
 
-.cardHeader h2 {
+.hero h1 {
   margin: 0;
-  font-size: 1.5rem;
+  color: var(--text);
+  font-size: 1.7rem;
 }
 
-.editButton {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  cursor: pointer;
-  padding: 0;
-  transition: transform 0.3s;
+.hero p {
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
-.editButton:hover {
-  transform: scale(1.2);
-}
-
-.detailRow {
+.actions {
   display: flex;
-  border-bottom: 1px solid #999;
-  min-height: 80px;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
-.detailRow:last-child {
-  border-bottom: none;
-  min-height: 150px;
+.primaryButton,
+.secondaryButton {
+  min-height: 40px;
+  padding: 0.65rem 0.9rem;
+  border-radius: 8px;
+  font-weight: 800;
 }
 
-.labelColumn {
-  flex: 0 0 40%;
-  background-color: #C9B9AD;
-  padding: 1.5rem;
-  font-weight: 600;
-  color: #333;
-  display: flex;
-  align-items: center;
-  border-right: 1px solid #999;
+.primaryButton {
+  background: var(--accent-strong);
+  color: #fff;
 }
 
-.valueColumn {
-  flex: 1;
-  background-color: #E8DFD5;
-  padding: 1.5rem;
-  color: #333;
-  display: flex;
-  align-items: center;
+.secondaryButton {
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  color: var(--text);
 }
 
-.lucroValue {
-  color: #4CAF50;
-  font-weight: 600;
+.titleInput {
+  width: min(560px, 100%);
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.metrics div {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.metrics span,
+.infoRows span {
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.metrics strong {
+  color: var(--text);
   font-size: 1.2rem;
+}
+
+.contentGrid {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  gap: 1rem;
+}
+
+.panel {
+  min-width: 0;
+}
+
+.panel h2 {
+  margin: 0 0 0.75rem;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.infoRows {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.infoRows div {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.infoRows div:first-child {
+  border-top: 0;
+}
+
+.infoRows strong {
+  color: var(--text);
+  font-weight: 750;
+}
+
+.infoRows input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.ordersTable {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.orderHeader,
+.orderRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px 120px;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.75rem 1rem;
+}
+
+.orderHeader {
+  background: var(--surface-strong);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.orderRow {
+  border-top: 1px solid var(--border);
+  transition: background-color 0.18s ease;
+}
+
+.orderRow:hover {
+  background: var(--surface-soft);
+}
+
+.orderRow span:nth-child(2),
+.orderRow strong {
+  text-align: right;
+}
+
+.empty {
+  padding: 1rem;
+  color: var(--muted);
+}
+
+@media (max-width: 860px) {
+  .hero,
+  .contentGrid {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .orderHeader,
+  .orderRow,
+  .infoRows div {
+    grid-template-columns: 1fr;
+    gap: 0.45rem;
+  }
+
+  .orderRow span:nth-child(2),
+  .orderRow strong {
+    text-align: left;
+  }
 }

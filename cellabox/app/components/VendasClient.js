@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getClientes, getProdutos, createPedido } from '@/services/back4app';
 import { getPackagingId } from '../utils/packaging';
+import { getCombinationPricing } from '../utils/pricing';
 import styles from '../vendas/page.module.css';
 import { useToast } from './ToastProvider';
 
@@ -55,8 +56,9 @@ export default function VendasClient() {
   const subtotal = useMemo(() => {
     return items.reduce((sum, item) => {
       const produto = produtosMap[item.productId];
-      const preco = produto ? Number(produto.precoVenda || produto.preco || 0) : 0;
-      return sum + preco * Number(item.quantidade || 0);
+      const embalagem = (produto?.embalagens || []).find((pack) => getPackagingId(pack) === item.embalagemId);
+      const pricing = getCombinationPricing(produto, embalagem);
+      return sum + pricing.valorVenda * Number(item.quantidade || 0);
     }, 0);
   }, [items, produtosMap]);
 
@@ -75,7 +77,7 @@ export default function VendasClient() {
     }
     if (items.some((item) => {
       const produto = produtosMap[item.productId] || {};
-      return (produto.embalagens || []).length > 0 && !item.embalagemId;
+      return (produto.embalagens || []).length === 0 || !item.embalagemId;
     })) {
       toast.error('Escolha a embalagem de cada produto.', 'Validação');
       return;
@@ -88,15 +90,22 @@ export default function VendasClient() {
       items: items.map((item) => {
         const produto = produtosMap[item.productId] || {};
         const embalagem = (produto.embalagens || []).find((pack) => getPackagingId(pack) === item.embalagemId);
+        const pricing = getCombinationPricing(produto, embalagem);
 
         return {
           productId: item.productId,
           nome: produto.nome || '',
           embalagemId: item.embalagemId,
           embalagemNome: embalagem?.nome || '',
-          embalagemCusto: Number(embalagem?.custoProducao || embalagem?.valor || 0),
+          embalagemCusto: pricing.custoEmbalagem,
+          embalagemPreco: pricing.valorVenda,
           quantidade: Number(item.quantidade || 1),
-          preco: Number(produto.precoVenda || produto.preco || 0),
+          preco: pricing.valorVenda,
+          valorVenda: pricing.valorVenda,
+          precoProduto: 0,
+          custoProduto: pricing.custoBaseProduto,
+          custoTotalProducao: pricing.custoFinalProducao,
+          lucroEstimado: pricing.lucroEstimado,
         };
       }),
       total: subtotal,
@@ -148,48 +157,75 @@ export default function VendasClient() {
           {items.map((item, idx) => {
             const produto = produtosMap[item.productId] || {};
             const embalagens = produto.embalagens || [];
+            const embalagem = embalagens.find((pack) => getPackagingId(pack) === item.embalagemId);
+            const pricing = getCombinationPricing(produto, embalagem);
 
             return (
-              <div key={idx} className={styles.itemRow}>
-                <select
-                  className={styles.productSelect}
-                  value={item.productId}
-                  onChange={(e) => updateItem(idx, 'productId', e.target.value)}
-                >
-                  <option value="">Produto</option>
-                  {produtos.map((p) => (
-                    <option key={p.objectId || p.id} value={p.objectId || p.id}>
-                      {p.nome} - R$ {Number(p.precoVenda || p.preco || 0).toFixed(2)}
-                    </option>
-                  ))}
-                </select>
+              <div key={idx} className={styles.itemBlock}>
+                <div className={styles.itemRow}>
+                  <select
+                    className={styles.productSelect}
+                    value={item.productId}
+                    onChange={(e) => updateItem(idx, 'productId', e.target.value)}
+                  >
+                    <option value="">Produto</option>
+                    {produtos.map((p) => (
+                      <option key={p.objectId || p.id} value={p.objectId || p.id}>
+                        {p.nome}
+                      </option>
+                    ))}
+                  </select>
 
-                <select
-                  className={styles.packageSelect}
-                  value={item.embalagemId}
-                  onChange={(e) => updateItem(idx, 'embalagemId', e.target.value)}
-                  disabled={!item.productId || embalagens.length === 0}
-                >
-                  <option value="">Embalagem</option>
-                  {embalagens.map((embalagem) => (
-                    <option key={getPackagingId(embalagem)} value={getPackagingId(embalagem)}>
-                      {embalagem.nome}
-                    </option>
-                  ))}
-                </select>
+                  <select
+                    className={styles.packageSelect}
+                    value={item.embalagemId}
+                    onChange={(e) => updateItem(idx, 'embalagemId', e.target.value)}
+                    disabled={!item.productId || embalagens.length === 0}
+                  >
+                    <option value="">Embalagem</option>
+                    {embalagens.map((pack) => {
+                      const optionPricing = getCombinationPricing(produto, pack);
+                      return (
+                        <option key={getPackagingId(pack)} value={getPackagingId(pack)}>
+                          {pack.nome} - R$ {optionPricing.valorVenda.toFixed(2)}
+                        </option>
+                      );
+                    })}
+                  </select>
 
-                <input
-                  type="number"
-                  min="1"
-                  value={item.quantidade}
-                  onChange={(e) => updateItem(idx, 'quantidade', e.target.value)}
-                  className={styles.qty}
-                  aria-label="Quantidade"
-                />
+                  <input
+                    type="number"
+                    min="1"
+                    value={item.quantidade}
+                    onChange={(e) => updateItem(idx, 'quantidade', e.target.value)}
+                    className={styles.qty}
+                    aria-label="Quantidade"
+                  />
 
-                <button className={styles.remove} onClick={() => removeItem(idx)} disabled={items.length === 1}>
-                  Remover
-                </button>
+                  <button className={styles.remove} onClick={() => removeItem(idx)} disabled={items.length === 1}>
+                    Remover
+                  </button>
+                </div>
+
+                {item.productId && item.embalagemId && (
+                  <div className={styles.priceBreakdown}>
+                    <div>
+                      <span>Produto</span>
+                      <strong>{pricing.nomeProduto || produto.nome || '-'}</strong>
+                      <small>R$ {pricing.custoBaseProduto.toFixed(2)}</small>
+                    </div>
+                    <div>
+                      <span>Embalagem</span>
+                      <strong>{pricing.nomeEmbalagem || embalagem?.nome || '-'}</strong>
+                      <small>R$ {pricing.custoEmbalagem.toFixed(2)}</small>
+                    </div>
+                    <div className={styles.priceTotal}>
+                      <span>Valor final</span>
+                      <strong>R$ {pricing.custoFinalProducao.toFixed(2)}</strong>
+                      <small>Venda: R$ {pricing.valorVenda.toFixed(2)}</small>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}

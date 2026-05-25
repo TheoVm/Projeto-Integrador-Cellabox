@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { getClientes, getGastos, getPedidos, getProdutos } from '@/services/back4app';
+import { getClientes, getGastos, getIngredientes, getPedidos, getProdutos } from '@/services/back4app';
+import { calculateExpenseValue, calculateOrderCost, calculateOrderRevenue } from './utils/finance';
 import styles from './page.module.css';
 
 export default function Home() {
@@ -10,39 +11,55 @@ export default function Home() {
   const [produtos, setProdutos] = useState([]);
   const [pedidos, setPedidos] = useState([]);
   const [gastos, setGastos] = useState([]);
+  const [ingredientesBase, setIngredientesBase] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function carregar() {
       setLoading(true);
-      const [clientesData, produtosData, pedidosData, gastosData] = await Promise.all([
+      const [clientesData, produtosData, pedidosData, gastosData, ingredientesData] = await Promise.all([
         getClientes(),
         getProdutos(),
         getPedidos(),
         getGastos(),
+        getIngredientes(),
       ]);
       setClientes(clientesData || []);
       setProdutos(produtosData || []);
       setPedidos(pedidosData || []);
       setGastos(gastosData || []);
+      setIngredientesBase((ingredientesData || []).map((item) => ({
+        id: item.objectId || item.id,
+        nome: item.nome,
+        valor: Number(item.valor || 0),
+      })));
       setLoading(false);
     }
 
     carregar();
   }, []);
 
+  const produtosMap = useMemo(() => {
+    const produtosMap = {};
+    produtos.forEach((produto) => {
+      produtosMap[produto.objectId || produto.id] = produto;
+    });
+    return produtosMap;
+  }, [produtos]);
+
   const resumo = useMemo(() => {
-    const receita = pedidos.reduce((sum, pedido) => sum + Number(pedido.total || pedido.valorTotal || 0), 0);
-    const despesas = gastos.reduce((sum, gasto) => sum + Number(gasto.valor || gasto.value || 0), 0);
+    const receita = pedidos.reduce((sum, pedido) => sum + calculateOrderRevenue(pedido, produtosMap), 0);
+    const despesas = gastos.reduce((sum, gasto) => sum + calculateExpenseValue(gasto), 0);
+    const custos = pedidos.reduce((sum, pedido) => sum + calculateOrderCost(pedido, produtosMap, ingredientesBase), 0);
     const ticketMedio = pedidos.length ? receita / pedidos.length : 0;
 
     return {
       receita,
       despesas,
       ticketMedio,
-      lucro: receita - despesas,
+      lucro: receita - despesas - custos,
     };
-  }, [pedidos, gastos]);
+  }, [pedidos, gastos, produtosMap, ingredientesBase]);
 
   const recentes = pedidos.slice(0, 4);
   const formatDate = (date) => date ? new Date(date).toLocaleDateString('pt-BR') : '-';
@@ -107,7 +124,7 @@ export default function Home() {
                   <strong>{pedido.clienteNome || 'Cliente'}</strong>
                   <span>{formatDate(pedido.createdAt)}</span>
                 </div>
-                <strong>R$ {Number(pedido.total || 0).toFixed(2)}</strong>
+                <strong>R$ {calculateOrderRevenue(pedido, produtosMap).toFixed(2)}</strong>
               </div>
             ))}
           </div>

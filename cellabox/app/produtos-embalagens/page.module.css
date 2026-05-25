@@ -81,6 +81,46 @@
   line-height: 1.45;
 }
 
+.packagingMeta {
+  display: grid;
+  gap: 0.25rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.packagingMeta span {
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.cardActions {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: 0.75rem;
+}
+
+.cardActions button {
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 750;
+  padding: 0.4rem 0.55rem;
+}
+
+.cardActions .deleteButton {
+  background: transparent;
+  border-color: transparent;
+  color: var(--danger);
+}
+
 .cardSelected {
   background: #F1E9D6;
   border-color: #d6cdb5;
@@ -160,12 +200,20 @@
 
 .modal textarea {
   resize: none;
-  height: 80px;
+  min-height: 80px;
+  height: auto;
+  field-sizing: content;
+  overflow-y: hidden;
 }
 
 .rowInputs {
   display: flex;
   gap: 0.5rem;
+  min-width: 0;
+}
+
+.singleInputRow {
+  display: block;
   min-width: 0;
 }
 

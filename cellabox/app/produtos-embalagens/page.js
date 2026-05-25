@@ -21,6 +21,7 @@ export default function ProdutosEmbalagens() {
   const [view, setView] = useState("produtos");
 
   const [showModal, setShowModal] = useState(false);
+  const [editingPackagingId, setEditingPackagingId] = useState(null);
 
   const [produtos, setProdutos] = useState([]);
   const [ingredientesBase] = useState(() => getStoredIngredients());
@@ -122,12 +123,30 @@ export default function ProdutosEmbalagens() {
       return;
     }
 
+    if (editingPackagingId) {
+      const atualizadas = embalagens.map((embalagem) => (
+        getPackagingId(embalagem) === editingPackagingId
+          ? {
+              ...embalagem,
+              nome,
+              descricao,
+              custoProducao: Number(custo || 0),
+            }
+          : embalagem
+      ));
+
+      setEmbalagens(atualizadas);
+      saveStoredPackaging(atualizadas);
+      toast.success("Embalagem atualizada com sucesso!");
+      resetForm();
+      return;
+    }
+
     const novaEmbalagem = {
         id: String(Date.now()),
         nome,
         descricao,
         custoProducao: Number(custo || 0),
-        precoVenda: Number(preco || 0),
       };
       
     const atualizadas = [novaEmbalagem, ...embalagens];
@@ -135,11 +154,32 @@ export default function ProdutosEmbalagens() {
     saveStoredPackaging(atualizadas);
     toast.success("Embalagem salva com sucesso!");
 
+    resetForm();
+  }
+
+  function resetForm() {
     setNome("");
     setDescricao("");
     setCusto("");
     setPreco("");
+    setIngredientes([{ nome: "", quantidade: "" }]);
+    setEmbalagensSelecionadas([]);
+    setEditingPackagingId(null);
     setShowModal(false);
+  }
+
+  function abrirNovoCadastro() {
+    resetForm();
+    setShowModal(true);
+  }
+
+  function editarEmbalagem(embalagem) {
+    setEditingPackagingId(getPackagingId(embalagem));
+    setNome(embalagem.nome || "");
+    setDescricao(embalagem.descricao || "");
+    setCusto(String(embalagem.custoProducao || embalagem.custo || ""));
+    setPreco("");
+    setShowModal(true);
   }
 
   async function removerItem(item) {
@@ -187,7 +227,7 @@ export default function ProdutosEmbalagens() {
             Embalagens
           </button>
         </div>
-        <button className={styles.addButton} onClick={() => setShowModal(true)}>
+        <button className={styles.addButton} onClick={abrirNovoCadastro}>
           + Adicionar
         </button>
       </div>
@@ -206,24 +246,34 @@ export default function ProdutosEmbalagens() {
               <div>
                 <h3>{item.nome}</h3>
                 <p>{item.descricao || (view === "produtos" ? "Produto cadastrado" : "Embalagem cadastrada")}</p>
+                {view === "embalagens" && (
+                  <div className={styles.packagingMeta}>
+                    <span>Custo de produção: R$ {Number(item.custoProducao || item.custo || 0).toFixed(2)}</span>
+                  </div>
+                )}
               </div>
               
-              <button
-                onClick={(e) => {
-                  e.stopPropagation(); 
-                  removerItem(item);
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#ff4d4d',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  padding: '5px'
-                }}
-              >
-                Excluir
-              </button>
+              <div className={styles.cardActions}>
+                {view === "embalagens" && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      editarEmbalagem(item);
+                    }}
+                  >
+                    Editar
+                  </button>
+                )}
+                <button
+                  className={styles.deleteButton}
+                  onClick={(e) => {
+                    e.stopPropagation(); 
+                    removerItem(item);
+                  }}
+                >
+                  Excluir
+                </button>
+              </div>
             </div>
           </div>
         ))}
@@ -232,7 +282,7 @@ export default function ProdutosEmbalagens() {
       {showModal && (
         <div className={styles.overlay}>
           <div className={styles.modal}>
-            <h3>{view === "produtos" ? "Novo Produto" : "Nova Embalagem"}</h3>
+            <h3>{view === "produtos" ? "Novo Produto" : editingPackagingId ? "Editar Embalagem" : "Nova Embalagem"}</h3>
 
             <input placeholder="Nome" value={nome} onChange={(e) => setNome(e.target.value)} />
 
@@ -242,11 +292,11 @@ export default function ProdutosEmbalagens() {
               onChange={(e) => setDescricao(e.target.value)}
             />
 
-            <div className={styles.rowInputs}>
+            <div className={view === "produtos" ? styles.rowInputs : styles.singleInputRow}>
               <div className={styles.inputGroup}>
                 <span>R$</span>
                 <input
-                  placeholder="Custo calculado"
+                  placeholder={view === "produtos" ? "Custo calculado" : "Custo de produção"}
                   type="number"
                   value={custo}
                   readOnly={view === "produtos"}
@@ -254,7 +304,7 @@ export default function ProdutosEmbalagens() {
                 />
               </div>
 
-              <div className={styles.inputGroup}>
+              {view === "produtos" && <div className={styles.inputGroup}>
                 <span>R$</span>
                 <input
                   placeholder="Preço de Venda"
@@ -262,7 +312,7 @@ export default function ProdutosEmbalagens() {
                   value={preco}
                   onChange={(e) => setPreco(e.target.value)}
                 />
-              </div>
+              </div>}
             </div>
 
             {view === "produtos" && <input type="file" />}
@@ -326,7 +376,7 @@ export default function ProdutosEmbalagens() {
             )}
 
             <div className={styles.modalActions}>
-              <button onClick={() => setShowModal(false)}>Cancelar</button>
+              <button onClick={resetForm}>Cancelar</button>
               <button
                 className={styles.saveButton}
                 onClick={view === "produtos" ? salvarProduto : salvarEmbalagem}

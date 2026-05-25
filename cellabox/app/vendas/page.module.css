@@ -14,13 +14,14 @@
 
 .mainContainer p {
   color: #666;
+}
+
 .pageHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1rem;
-}
 }
 
 .pageHeader p {
@@ -92,6 +93,55 @@
   border-radius: 8px;
 }
 
+.itemBlock {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.priceBreakdown {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+  padding: 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.priceBreakdown div {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.priceBreakdown span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.priceBreakdown strong {
+  color: var(--text);
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
+}
+
+.priceBreakdown small {
+  color: var(--accent-strong);
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.priceTotal {
+  padding-left: 0.65rem;
+  border-left: 1px solid var(--border);
+}
+
+.priceTotal strong {
+  font-size: 1.08rem;
+}
+
 .remove {
   min-height: 42px;
   background: rgba(181, 69, 69, 0.1);
@@ -153,5 +203,16 @@
 
   .itemRow {
     grid-template-columns: 1fr;
+  }
+
+  .priceBreakdown {
+    grid-template-columns: 1fr;
+  }
+
+  .priceTotal {
+    padding-left: 0;
+    padding-top: 0.55rem;
+    border-left: 0;
+    border-top: 1px solid var(--border);
   }
 }

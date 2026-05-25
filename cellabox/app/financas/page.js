@@ -16,7 +16,13 @@ import FinanceChart from '../components/FinanceChart';
 import ExpenseTable from '../components/ExpenseTable';
 import compStyles from '../components/finance.module.css';
 import pageStyles from './page.module.css';
-import { buildMonthlyFinanceSeries, calculateSoldItemCost } from '../utils/finance';
+import {
+  buildDailyFinanceSeries,
+  calculateExpenseValue,
+  calculateOrderCost,
+  calculateOrderRevenue,
+  getAvailableFinancePeriods,
+} from '../utils/finance';
 import { useToast } from '../components/ToastProvider';
 
 export default function Financas() {
@@ -30,6 +36,8 @@ export default function Financas() {
   const [expenseNome, setExpenseNome] = useState('');
   const [expenseDescricao, setExpenseDescricao] = useState('');
   const [expenseValor, setExpenseValor] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
 
   useEffect(() => {
     carregarTudo();
@@ -72,28 +80,49 @@ export default function Financas() {
 
   const receitaTotal = useMemo(() => {
     return (pedidos || []).reduce((sum, pedido) => (
-      sum + Number(pedido.total || pedido.valorTotal || pedido.totalPedido || 0)
+      sum + calculateOrderRevenue(pedido, produtosMap)
     ), 0);
-  }, [pedidos]);
+  }, [pedidos, produtosMap]);
 
   const gastosTotais = useMemo(() => {
-    return (gastos || []).reduce((sum, gasto) => sum + Number(gasto.valor || gasto.value || 0), 0);
+    return (gastos || []).reduce((sum, gasto) => sum + calculateExpenseValue(gasto), 0);
   }, [gastos]);
 
   const custoProdutos = useMemo(() => {
-    return (pedidos || []).reduce((sum, pedido) => {
-      const items = pedido.items || [];
-      return sum + items.reduce((subtotal, item) => (
-        subtotal + calculateSoldItemCost(item, produtosMap, ingredientesBase)
-      ), 0);
-    }, 0);
+    return (pedidos || []).reduce((sum, pedido) => (
+      sum + calculateOrderCost(pedido, produtosMap, ingredientesBase)
+    ), 0);
   }, [pedidos, produtosMap, ingredientesBase]);
 
   const lucroTotal = receitaTotal - gastosTotais - custoProdutos;
 
+  const availablePeriods = useMemo(() => {
+    return getAvailableFinancePeriods({ pedidos, gastos });
+  }, [pedidos, gastos]);
+
+  const monthOptions = useMemo(() => {
+    return Array.from({ length: 12 }, (_, month) => ({
+      value: month,
+      label: new Date(selectedYear, month, 1).toLocaleDateString('pt-BR', { month: 'long' }),
+    }));
+  }, [selectedYear]);
+
+  const yearOptions = useMemo(() => {
+    const years = new Set(availablePeriods.map((period) => period.year));
+    years.add(new Date().getFullYear());
+    return Array.from(years).sort((a, b) => b - a);
+  }, [availablePeriods]);
+
   const series = useMemo(() => {
-    return buildMonthlyFinanceSeries({ pedidos, gastos, produtosMap, ingredientesBase });
-  }, [pedidos, gastos, produtosMap, ingredientesBase]);
+    return buildDailyFinanceSeries({
+      pedidos,
+      gastos,
+      produtosMap,
+      ingredientesBase,
+      month: selectedMonth,
+      year: selectedYear,
+    });
+  }, [pedidos, gastos, produtosMap, ingredientesBase, selectedMonth, selectedYear]);
 
   async function handleAddExpense() {
     if (!expenseNome || !expenseValor || Number(expenseValor) <= 0) {
@@ -135,8 +164,26 @@ export default function Financas() {
       <div className={pageStyles.layoutGrid}>
         <div className={pageStyles.chartArea}>
           <div className={pageStyles.chartHeader}>
-            <h3>Histórico financeiro mensal</h3>
-            <p>Receita, gastos e lucro dos últimos meses até o mês atual.</p>
+            <div>
+              <h3>Lucro e gastos por dia</h3>
+              <p>Receita, gastos e lucro diário do mês selecionado.</p>
+            </div>
+            <div className={pageStyles.chartFilters}>
+              <select value={selectedMonth} onChange={(event) => setSelectedMonth(Number(event.target.value))}>
+                {monthOptions.map((month) => (
+                  <option key={month.value} value={month.value}>
+                    {month.label}
+                  </option>
+                ))}
+              </select>
+              <select value={selectedYear} onChange={(event) => setSelectedYear(Number(event.target.value))}>
+                {yearOptions.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           <FinanceChart series={series} />
         </div>

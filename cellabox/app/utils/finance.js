@@ -1,4 +1,21 @@
-import { calculateProductCost } from './ingredients';
+import { getCombinationPricing } from './pricing';
+
+function firstNumber(...values) {
+  const found = values.find((value) => value !== undefined && value !== null && value !== '');
+  const number = Number(found || 0);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function getProductFromItem(item, produtosMap) {
+  return produtosMap[item.productId || item.produtoId || item.id] || null;
+}
+
+function getItemPackaging(item, produto) {
+  const embalagemId = item.embalagemId || item.packageId;
+  return (produto?.embalagens || []).find((embalagem) => (
+    (embalagem.objectId || embalagem.id || embalagem.nome) === embalagemId
+  ));
+}
 
 function monthKeyFromDate(value) {
   const date = value ? new Date(value) : new Date();
@@ -21,6 +38,10 @@ function addMonth(map, key) {
   return map[key];
 }
 
+function sameMonth(date, month, year) {
+  return date.getFullYear() === year && date.getMonth() === month;
+}
+
 function getRecentMonthKeys(existingKeys, minimumMonths = 6) {
   const now = new Date();
   const keys = new Set(existingKeys);
@@ -34,14 +55,46 @@ function getRecentMonthKeys(existingKeys, minimumMonths = 6) {
 }
 
 export function calculateSoldItemCost(item, produtosMap, ingredientesBase) {
-  const produto = produtosMap[item.productId || item.produtoId || item.id];
-  const productCost = produto
-    ? calculateProductCost(produto.ingredientes || [], ingredientesBase) || Number(produto.custoProducao || produto.custo || 0)
-    : Number(item.custo || 0);
-  const packagingCost = Number(item.embalagemCusto || 0);
-  const quantity = Number(item.quantidade || item.qtd || 1);
+  const snapshotFinalCost = firstNumber(item.custoTotalProducao, item.custoProducao);
+  const quantity = firstNumber(item.quantidade, item.qtd, 1) || 1;
+
+  if (snapshotFinalCost) return snapshotFinalCost * quantity;
+
+  const produto = getProductFromItem(item, produtosMap);
+  const embalagem = getItemPackaging(item, produto);
+  const pricing = getCombinationPricing(produto || {}, embalagem || {}, ingredientesBase);
+  const productCost = firstNumber(item.custoProduto, item.produtoCusto, item.custo) || pricing.custoBaseProduto;
+  const packagingCost = firstNumber(item.embalagemCusto, item.custoEmbalagem) || pricing.custoEmbalagem;
 
   return (productCost + packagingCost) * quantity;
+}
+
+export function calculateSoldItemRevenue(item, produtosMap) {
+  const produto = getProductFromItem(item, produtosMap);
+  const embalagem = getItemPackaging(item, produto);
+  const pricing = getCombinationPricing(produto || {}, embalagem || {});
+  const unitPrice = firstNumber(item.valorVenda, item.preco, item.valorUnitario, item.precoUnitario, item.embalagemPreco) || pricing.valorVenda;
+  const quantity = firstNumber(item.quantidade, item.qtd, 1) || 1;
+
+  return unitPrice * quantity;
+}
+
+export function calculateOrderRevenue(pedido, produtosMap = {}) {
+  const itemRevenue = (pedido.items || []).reduce((sum, item) => (
+    sum + calculateSoldItemRevenue(item, produtosMap)
+  ), 0);
+
+  return itemRevenue || firstNumber(pedido.total, pedido.valorTotal, pedido.totalPedido, pedido.valor);
+}
+
+export function calculateOrderCost(pedido, produtosMap = {}, ingredientesBase = []) {
+  return (pedido.items || []).reduce((sum, item) => (
+    sum + calculateSoldItemCost(item, produtosMap, ingredientesBase)
+  ), 0);
+}
+
+export function calculateExpenseValue(gasto) {
+  return firstNumber(gasto.valor, gasto.value, gasto.total);
 }
 
 export function buildMonthlyFinanceSeries({ pedidos = [], gastos = [], produtosMap = {}, ingredientesBase = [] }) {
@@ -50,16 +103,14 @@ export function buildMonthlyFinanceSeries({ pedidos = [], gastos = [], produtosM
   pedidos.forEach((pedido) => {
     const key = monthKeyFromDate(pedido.createdAt || pedido.date);
     const month = addMonth(months, key);
-    month.receita += Number(pedido.total || pedido.valorTotal || pedido.totalPedido || 0);
-    month.custos += (pedido.items || []).reduce((sum, item) => (
-      sum + calculateSoldItemCost(item, produtosMap, ingredientesBase)
-    ), 0);
+    month.receita += calculateOrderRevenue(pedido, produtosMap);
+    month.custos += calculateOrderCost(pedido, produtosMap, ingredientesBase);
   });
 
   gastos.forEach((gasto) => {
     const key = monthKeyFromDate(gasto.createdAt || gasto.data || gasto.date);
     const month = addMonth(months, key);
-    month.gastos += Number(gasto.valor || gasto.value || 0);
+    month.gastos += calculateExpenseValue(gasto);
   });
 
   return getRecentMonthKeys(Object.keys(months)).map((key) => {
@@ -69,4 +120,63 @@ export function buildMonthlyFinanceSeries({ pedidos = [], gastos = [], produtosM
       lucro: month.receita - month.gastos - month.custos,
     };
   });
+}
+
+export function buildDailyFinanceSeries({
+  pedidos = [],
+  gastos = [],
+  produtosMap = {},
+  ingredientesBase = [],
+  month,
+  year,
+}) {
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const days = Array.from({ length: daysInMonth }, (_, index) => ({
+    label: String(index + 1).padStart(2, '0'),
+    receita: 0,
+    gastos: 0,
+    custos: 0,
+    lucro: 0,
+  }));
+
+  pedidos.forEach((pedido) => {
+    const date = new Date(pedido.createdAt || pedido.date || pedido.data || Date.now());
+    if (!sameMonth(date, month, year)) return;
+
+    const day = days[date.getDate() - 1];
+    day.receita += calculateOrderRevenue(pedido, produtosMap);
+    day.custos += calculateOrderCost(pedido, produtosMap, ingredientesBase);
+  });
+
+  gastos.forEach((gasto) => {
+    const date = new Date(gasto.createdAt || gasto.data || gasto.date || Date.now());
+    if (!sameMonth(date, month, year)) return;
+
+    const day = days[date.getDate() - 1];
+    day.gastos += calculateExpenseValue(gasto);
+  });
+
+  return days.map((day) => ({
+    ...day,
+    lucro: day.receita - day.gastos - day.custos,
+  }));
+}
+
+export function getAvailableFinancePeriods({ pedidos = [], gastos = [] }) {
+  const periods = new Map();
+
+  [...pedidos, ...gastos].forEach((item) => {
+    const date = new Date(item.createdAt || item.data || item.date || Date.now());
+    if (Number.isNaN(date.getTime())) return;
+    const key = `${date.getFullYear()}-${date.getMonth()}`;
+    periods.set(key, { year: date.getFullYear(), month: date.getMonth() });
+  });
+
+  const now = new Date();
+  const currentKey = `${now.getFullYear()}-${now.getMonth()}`;
+  periods.set(currentKey, { year: now.getFullYear(), month: now.getMonth() });
+
+  return Array.from(periods.values()).sort((a, b) => (
+    a.year === b.year ? a.month - b.month : a.year - b.year
+  ));
 }

@@ -2,11 +2,80 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { getProduto, updateProduto } from '@/services/back4app';
+import { getIngredientes, getProduto, updateProduto } from '@/services/back4app';
 import { calculateIngredientCost, calculateProductCost, getStoredIngredients } from '../../utils/ingredients';
 import { getPackagingId, getStoredPackaging } from '../../utils/packaging';
 import { useToast } from '../../components/ToastProvider';
 import styles from './page.module.css';
+
+function getIngredientId(ingrediente) {
+  return ingrediente?.objectId || ingrediente?.id || ingrediente?.nome || '';
+}
+
+function encontrarIngredienteBase(ingrediente, baseList = []) {
+  return baseList.find((item) => (
+    getIngredientId(item) === ingrediente.ingredienteId
+    || item.nome?.trim().toLowerCase() === ingrediente.nome?.trim().toLowerCase()
+  ));
+}
+
+function prepararIngredienteEditavel(ingrediente = {}, baseList = []) {
+  const base = encontrarIngredienteBase(ingrediente, baseList);
+  return {
+    ingredienteId: ingrediente.ingredienteId || getIngredientId(base) || '',
+    nome: ingrediente.nome || base?.nome || '',
+    quantidade: ingrediente.quantidade ? String(ingrediente.quantidade) : '',
+    unidade: 'g',
+  };
+}
+
+function toGramas(quantidade, unidade) {
+  const valor = Number(quantidade || 0);
+  return unidade === 'kg' ? valor * 1000 : valor;
+}
+
+function montarIngredientesCalculados(lista, ingredientesBase) {
+  return lista
+    .filter((ingrediente) => ingrediente.nome && Number(ingrediente.quantidade || 0) > 0)
+    .map((ingrediente) => {
+      const quantidade = toGramas(ingrediente.quantidade, ingrediente.unidade);
+      const normalizado = { nome: ingrediente.nome, quantidade };
+      const calculo = calculateIngredientCost(normalizado, ingredientesBase);
+
+      return {
+        ingredienteId: ingrediente.ingredienteId || '',
+        nome: ingrediente.nome,
+        quantidade,
+        valorKg: calculo.valorKg,
+        custo: calculo.custo,
+      };
+    });
+}
+
+function getPackageCost(embalagem) {
+  return Number(embalagem?.custoEmbalagem ?? embalagem?.custoProducao ?? embalagem?.custo ?? 0);
+}
+
+function getPackageSalePrice(embalagem) {
+  return Number(embalagem?.valorVenda ?? embalagem?.precoVenda ?? embalagem?.valor ?? 0);
+}
+
+function montarEmbalagemDoProduto(embalagem, custoIngredientes, custoEmbalagem, valorVenda) {
+  const custoFinal = Number(custoIngredientes || 0) + Number(custoEmbalagem || 0);
+  const venda = Number(valorVenda || 0);
+
+  return {
+    ...embalagem,
+    embalagemId: embalagem.embalagemId || getPackagingId(embalagem),
+    nome: embalagem.nome || '',
+    custoIngredientes: Number(custoIngredientes || 0),
+    custoEmbalagem: Number(custoEmbalagem || 0),
+    custoProducao: custoFinal,
+    valorVenda: venda,
+    precoVenda: venda,
+    lucroEstimado: venda - custoFinal,
+  };
+}
 
 export default function ProdutoIndividual() {
   const toast = useToast();
@@ -22,11 +91,21 @@ export default function ProdutoIndividual() {
   const [nomeEditado, setNomeEditado] = useState('');
   const [descricaoEditada, setDescricaoEditada] = useState('');
   const [precoEditado, setPrecoEditado] = useState('');
+  const [ingredientesEditados, setIngredientesEditados] = useState([]);
+  const [novaEmbalagemId, setNovaEmbalagemId] = useState('');
+  const [novoValorVenda, setNovoValorVenda] = useState('');
 
   useEffect(() => {
     async function carregarProduto() {
       setLoading(true);
-      setIngredientesBase(getStoredIngredients());
+      const ingredientesCadastrados = await getIngredientes();
+      const ingredientesFormatados = (ingredientesCadastrados || []).map((item) => ({
+        id: item.objectId || item.id,
+        objectId: item.objectId,
+        nome: item.nome,
+        valor: Number(item.valor || 0),
+      }));
+      setIngredientesBase(ingredientesFormatados.length ? ingredientesFormatados : getStoredIngredients());
       setEmbalagensBase(getStoredPackaging());
       
       const data = await getProduto(id);
@@ -35,6 +114,9 @@ export default function ProdutoIndividual() {
         setNomeEditado(data.nome || '');
         setDescricaoEditada(data.descricao || '');
         setPrecoEditado(data.precoVenda || data.preco || '');
+        setIngredientesEditados((data.ingredientes || []).map((ingrediente) => (
+          prepararIngredienteEditavel(ingrediente, ingredientesFormatados.length ? ingredientesFormatados : getStoredIngredients())
+        )));
       }
       setLoading(false);
     }
@@ -42,7 +124,9 @@ export default function ProdutoIndividual() {
     if (id) carregarProduto();
   }, [id]);
 
-  const ingredientes = useMemo(() => produto?.ingredientes || [], [produto]);
+  const ingredientes = useMemo(() => (
+    editando ? montarIngredientesCalculados(ingredientesEditados, ingredientesBase) : produto?.ingredientes || []
+  ), [editando, ingredientesEditados, produto, ingredientesBase]);
   const embalagens = useMemo(() => produto?.embalagens || [], [produto]);
   
   const custoProduto = useMemo(() => {
@@ -63,12 +147,45 @@ export default function ProdutoIndividual() {
     return embalagensBase.filter((embalagem) => !embalagensIds.has(getPackagingId(embalagem)));
   }, [embalagensBase, embalagensIds]);
 
+  const embalagensComCustos = useMemo(() => {
+    return embalagens.map((embalagem) => montarEmbalagemDoProduto(
+      embalagem,
+      custoProduto,
+      getPackageCost(embalagem),
+      getPackageSalePrice(embalagem)
+    ));
+  }, [embalagens, custoProduto]);
+
+  const menorCustoFinal = useMemo(() => {
+    if (!embalagensComCustos.length) return custoProduto;
+    return Math.min(...embalagensComCustos.map((embalagem) => Number(embalagem.custoProducao || 0)));
+  }, [embalagensComCustos, custoProduto]);
+
   async function salvarEdicao() {
+    const ingredientesCalculados = montarIngredientesCalculados(ingredientesEditados, ingredientesBase);
+    const custoBaseAtualizado = calculateProductCost(ingredientesCalculados, ingredientesBase);
+    const hasIngredienteInvalido = ingredientesEditados.some((ingrediente) => (
+      ingrediente.nome && Number(ingrediente.quantidade || 0) <= 0
+    ));
+
+    if (hasIngredienteInvalido) {
+      toast.error('Informe uma quantidade valida para cada ingrediente.', 'Validacao');
+      return;
+    }
+
     try {
       const dadosAtualizados = {
         nome: nomeEditado,
         descricao: descricaoEditada,
-        precoVenda: Number(precoEditado)
+        precoVenda: Number(precoEditado),
+        custoProducao: custoBaseAtualizado,
+        ingredientes: ingredientesCalculados,
+        embalagens: embalagens.map((embalagem) => montarEmbalagemDoProduto(
+          embalagem,
+          custoBaseAtualizado,
+          getPackageCost(embalagem),
+          getPackageSalePrice(embalagem)
+        )),
       };
       await updateProduto(id, dadosAtualizados);
       
@@ -81,11 +198,50 @@ export default function ProdutoIndividual() {
     }
   }
 
+  function iniciarEdicao() {
+    setIngredientesEditados((produto?.ingredientes || []).map((ingrediente) => prepararIngredienteEditavel(ingrediente)));
+    setEditando(true);
+  }
+
+  function adicionarIngrediente() {
+    setIngredientesEditados((current) => [
+      ...current,
+      { ingredienteId: '', nome: '', quantidade: '', unidade: 'g' },
+    ]);
+  }
+
+  function atualizarIngrediente(index, field, value) {
+    setIngredientesEditados((current) => current.map((ingrediente, currentIndex) => {
+      if (currentIndex !== index) return ingrediente;
+
+      if (field === 'ingredienteId') {
+        const selecionado = ingredientesBase.find((item) => getIngredientId(item) === value);
+        return {
+          ...ingrediente,
+          ingredienteId: value,
+          nome: selecionado?.nome || '',
+        };
+      }
+
+      return { ...ingrediente, [field]: value };
+    }));
+  }
+
+  function removerIngrediente(index) {
+    setIngredientesEditados((current) => current.filter((_, currentIndex) => currentIndex !== index));
+  }
+
   async function salvarEmbalagens(nextEmbalagens) {
     setSavingPackaging(true);
     try {
-      await updateProduto(id, { embalagens: nextEmbalagens });
-      setProduto((current) => ({ ...current, embalagens: nextEmbalagens }));
+      const embalagensCalculadas = nextEmbalagens.map((embalagem) => montarEmbalagemDoProduto(
+        embalagem,
+        custoProduto,
+        getPackageCost(embalagem),
+        getPackageSalePrice(embalagem)
+      ));
+      await updateProduto(id, { embalagens: embalagensCalculadas });
+      setProduto((current) => ({ ...current, embalagens: embalagensCalculadas }));
     } catch (error) {
       console.error(error);
       toast.error('Erro ao atualizar embalagens do produto');
@@ -94,10 +250,39 @@ export default function ProdutoIndividual() {
     }
   }
 
-  function adicionarEmbalagem(embalagemId) {
+  function selecionarNovaEmbalagem(embalagemId) {
+    setNovaEmbalagemId(embalagemId);
     const embalagem = embalagensBase.find((item) => getPackagingId(item) === embalagemId);
+    setNovoValorVenda(embalagem ? String(getPackageSalePrice(embalagem)) : '');
+  }
+
+  function adicionarEmbalagem() {
+    const embalagem = embalagensBase.find((item) => getPackagingId(item) === novaEmbalagemId);
     if (!embalagem) return;
-    salvarEmbalagens([...embalagens, embalagem]);
+    if (Number(novoValorVenda || 0) < 0) {
+      toast.error('Informe um valor de venda valido para a combinacao.', 'Validacao');
+      return;
+    }
+
+    const novaRelacao = montarEmbalagemDoProduto(
+      embalagem,
+      custoProduto,
+      getPackageCost(embalagem),
+      Number(novoValorVenda || 0)
+    );
+
+    salvarEmbalagens([...embalagens, novaRelacao]);
+    setNovaEmbalagemId('');
+    setNovoValorVenda('');
+  }
+
+  function atualizarValorVendaEmbalagem(index, value) {
+    const atualizadas = embalagens.map((embalagem, currentIndex) => {
+      if (currentIndex !== index) return embalagem;
+      return montarEmbalagemDoProduto(embalagem, custoProduto, getPackageCost(embalagem), Number(value || 0));
+    });
+
+    salvarEmbalagens(atualizadas);
   }
 
   function removerEmbalagem(embalagemId) {
@@ -139,7 +324,7 @@ export default function ProdutoIndividual() {
                 <textarea 
                   value={descricaoEditada} 
                   onChange={(e) => setDescricaoEditada(e.target.value)} 
-                  style={{ width: '100%', minHeight: '60px', marginTop: '10px', padding: '5px' }}
+                  className={styles.descriptionInput}
                 />
               </>
             ) : (
@@ -160,7 +345,7 @@ export default function ProdutoIndividual() {
               </button>
             ) : (
               <button 
-                onClick={() => setEditando(true)} 
+                onClick={iniciarEdicao} 
                 style={{ background: '#f0f0f0', border: '1px solid #ccc', padding: '8px 15px', borderRadius: '5px', cursor: 'pointer' }}>
                 Editar
               </button>
@@ -170,27 +355,18 @@ export default function ProdutoIndividual() {
 
         <div className={styles.metrics}>
           <div>
-            <span>Custo médio</span>
+            <span>Custo base</span>
             <strong>R$ {custoProduto.toFixed(2)}</strong>
           </div>
 
           <div>
-            <span>Preço de venda</span>
-            {editando ? (
-               <input 
-                 type="number" 
-                 value={precoEditado} 
-                 onChange={(e) => setPrecoEditado(e.target.value)} 
-                 style={{ width: '100px', fontSize: '16px', fontWeight: 'bold', padding: '2px' }}
-               />
-            ) : (
-              <strong>R$ {Number(produto.precoVenda || produto.preco || 0).toFixed(2)}</strong>
-            )}
+            <span>Menor custo final</span>
+            <strong>R$ {menorCustoFinal.toFixed(2)}</strong>
           </div>
 
           <div>
-            <span>Lucro médio</span>
-            <strong>R$ {lucro.toFixed(2)}</strong>
+            <span>Combinações</span>
+            <strong>{embalagensComCustos.length}</strong>
           </div>
         </div>
 
@@ -199,6 +375,51 @@ export default function ProdutoIndividual() {
             <h3 className={styles.sectionTitle}>Ingredientes</h3>
 
             <div className={styles.section}>
+              {editando && (
+                <div className={styles.ingredientEditor}>
+                  {ingredientesEditados.map((ingrediente, index) => (
+                    <div key={`${ingrediente.nome}-${index}`} className={styles.ingredientEditorRow}>
+                      <select
+                        value={ingrediente.ingredienteId}
+                        onChange={(event) => atualizarIngrediente(index, 'ingredienteId', event.target.value)}
+                      >
+                        <option value="">Selecionar ingrediente</option>
+                        {ingredientesBase.map((item) => (
+                          <option key={getIngredientId(item)} value={getIngredientId(item)}>
+                            {item.nome}
+                          </option>
+                        ))}
+                      </select>
+
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={ingrediente.quantidade}
+                        onChange={(event) => atualizarIngrediente(index, 'quantidade', event.target.value)}
+                        placeholder="Qtd"
+                      />
+
+                      <select
+                        value={ingrediente.unidade}
+                        onChange={(event) => atualizarIngrediente(index, 'unidade', event.target.value)}
+                      >
+                        <option value="g">g</option>
+                        <option value="kg">kg</option>
+                      </select>
+
+                      <button type="button" onClick={() => removerIngrediente(index)}>
+                        Remover
+                      </button>
+                    </div>
+                  ))}
+
+                  <button type="button" className={styles.addIngredient} onClick={adicionarIngrediente}>
+                    + Adicionar ingrediente
+                  </button>
+                </div>
+              )}
+
               <div className={styles.table3}>
                 <div className={styles.rowHeader3}>
                   <span>Ingrediente</span>
@@ -222,15 +443,14 @@ export default function ProdutoIndividual() {
               </div>
             </div>
           </div>
+          <div className={styles.sectionWrapper}>
+            <h3 className={styles.sectionTitle}>Custos por embalagem</h3>
 
-          <div className={styles.sectionWrapperSmall}>
-            <h3 className={styles.sectionTitle}>Embalagens</h3>
-
-            <div className={styles.sectionSmall}>
+            <div className={styles.section}>
               <div className={styles.packageControls}>
                 <select
-                  value=""
-                  onChange={(event) => adicionarEmbalagem(event.target.value)}
+                  value={novaEmbalagemId}
+                  onChange={(event) => selecionarNovaEmbalagem(event.target.value)}
                   disabled={savingPackaging || embalagensDisponiveis.length === 0}
                 >
                   <option value="">Adicionar embalagem</option>
@@ -240,29 +460,62 @@ export default function ProdutoIndividual() {
                     </option>
                   ))}
                 </select>
+
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={novoValorVenda}
+                  onChange={(event) => setNovoValorVenda(event.target.value)}
+                  placeholder="Valor de venda"
+                />
+
+                <button
+                  type="button"
+                  onClick={adicionarEmbalagem}
+                  disabled={savingPackaging || !novaEmbalagemId}
+                >
+                  Adicionar
+                </button>
               </div>
 
-              <div className={styles.table2}>
-                <div className={styles.rowHeader2}>
+              <div className={styles.packageTable}>
+                <div className={styles.packageHeader}>
                   <span>Tipo</span>
-                  <span>Valor</span>
+                  <span>Custo base</span>
+                  <span>Custo embalagem</span>
+                  <span>Custo final</span>
+                  <span>Venda final</span>
+                  <span>Lucro estimado</span>
+                  <span></span>
                 </div>
 
-                {embalagens.length === 0 ? (
+                {embalagensComCustos.length === 0 ? (
                   <div className={styles.empty}>Nenhuma embalagem vinculada.</div>
-                ) : embalagens.map((embalagem, index) => (
-                  <div key={`${embalagem.nome}-${index}`} className={styles.row2}>
+                ) : embalagensComCustos.map((embalagem, index) => (
+                  <div key={`${embalagem.nome}-${index}`} className={styles.packageRow}>
                     <span>{embalagem.nome || '-'}</span>
+                    <span>R$ {Number(embalagem.custoIngredientes || 0).toFixed(2)}</span>
+                    <span>R$ {Number(embalagem.custoEmbalagem || 0).toFixed(2)}</span>
+                    <strong>R$ {Number(embalagem.custoProducao || 0).toFixed(2)}</strong>
                     <span>
-                      R$ {Number(embalagem.custoProducao || embalagem.valor || 0).toFixed(2)}
-                      <button
-                        className={styles.removePackage}
-                        onClick={() => removerEmbalagem(getPackagingId(embalagem))}
-                        disabled={savingPackaging}
-                      >
-                        Remover
-                      </button>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        defaultValue={Number(embalagem.valorVenda || 0).toFixed(2)}
+                        onBlur={(event) => atualizarValorVendaEmbalagem(index, event.target.value)}
+                        aria-label={`Valor de venda da embalagem ${embalagem.nome}`}
+                      />
                     </span>
+                    <strong>R$ {Number(embalagem.lucroEstimado || 0).toFixed(2)}</strong>
+                    <button
+                      className={styles.removePackage}
+                      onClick={() => removerEmbalagem(getPackagingId(embalagem))}
+                      disabled={savingPackaging}
+                    >
+                      Remover
+                    </button>
                   </div>
                 ))}
               </div>
