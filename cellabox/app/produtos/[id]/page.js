@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { getIngredientes, getProduto, updateProduto } from '@/services/back4app';
-import { calculateIngredientCost, calculateProductCost, getStoredIngredients } from '../../utils/ingredients';
+import { calculateIngredientCost, calculateProductCost, getStoredIngredients, normalizeMeasure } from '../../utils/ingredients';
 import { getPackagingId, getStoredPackaging } from '../../utils/packaging';
 import { useToast } from '../../components/ToastProvider';
 import styles from './page.module.css';
@@ -21,16 +21,18 @@ function encontrarIngredienteBase(ingrediente, baseList = []) {
 
 function prepararIngredienteEditavel(ingrediente = {}, baseList = []) {
   const base = encontrarIngredienteBase(ingrediente, baseList);
+  const unidadeBase = normalizeMeasure(ingrediente.unidadeMedida || base?.unidadeMedida || base?.medida);
   return {
     ingredienteId: ingrediente.ingredienteId || getIngredientId(base) || '',
     nome: ingrediente.nome || base?.nome || '',
     quantidade: ingrediente.quantidade ? String(ingrediente.quantidade) : '',
-    unidade: 'g',
+    unidade: ingrediente.unidade || (unidadeBase === 'unidade' ? 'un' : 'g'),
   };
 }
 
-function toGramas(quantidade, unidade) {
+function toQuantidadeBase(quantidade, unidade) {
   const valor = Number(quantidade || 0);
+  if (unidade === 'un') return valor;
   return unidade === 'kg' ? valor * 1000 : valor;
 }
 
@@ -38,15 +40,19 @@ function montarIngredientesCalculados(lista, ingredientesBase) {
   return lista
     .filter((ingrediente) => ingrediente.nome && Number(ingrediente.quantidade || 0) > 0)
     .map((ingrediente) => {
-      const quantidade = toGramas(ingrediente.quantidade, ingrediente.unidade);
-      const normalizado = { nome: ingrediente.nome, quantidade };
+      const quantidade = toQuantidadeBase(ingrediente.quantidade, ingrediente.unidade);
+      const unidadeNormalizada = ingrediente.unidade === 'un' ? 'un' : 'g';
+      const normalizado = { nome: ingrediente.nome, quantidade, unidade: unidadeNormalizada };
       const calculo = calculateIngredientCost(normalizado, ingredientesBase);
 
       return {
         ingredienteId: ingrediente.ingredienteId || '',
         nome: ingrediente.nome,
         quantidade,
+        unidade: unidadeNormalizada,
+        unidadeMedida: calculo.unidadeMedida,
         valorKg: calculo.valorKg,
+        valorUnidade: calculo.valorUnidade,
         custo: calculo.custo,
       };
     });
@@ -104,6 +110,7 @@ export default function ProdutoIndividual() {
         objectId: item.objectId,
         nome: item.nome,
         valor: Number(item.valor || 0),
+        unidadeMedida: normalizeMeasure(item.unidadeMedida || item.medida),
       }));
       setIngredientesBase(ingredientesFormatados.length ? ingredientesFormatados : getStoredIngredients());
       setEmbalagensBase(getStoredPackaging());
@@ -220,6 +227,7 @@ export default function ProdutoIndividual() {
           ...ingrediente,
           ingredienteId: value,
           nome: selecionado?.nome || '',
+          unidade: normalizeMeasure(selecionado?.unidadeMedida || selecionado?.medida) === 'unidade' ? 'un' : 'g',
         };
       }
 
@@ -229,6 +237,11 @@ export default function ProdutoIndividual() {
 
   function removerIngrediente(index) {
     setIngredientesEditados((current) => current.filter((_, currentIndex) => currentIndex !== index));
+  }
+
+  function ingredienteEditadoIsUnit(ingrediente) {
+    const base = ingredientesBase.find((item) => getIngredientId(item) === ingrediente.ingredienteId);
+    return normalizeMeasure(ingrediente.unidadeMedida || base?.unidadeMedida || base?.medida) === 'unidade';
   }
 
   async function salvarEmbalagens(nextEmbalagens) {
@@ -401,11 +414,18 @@ export default function ProdutoIndividual() {
                       />
 
                       <select
-                        value={ingrediente.unidade}
+                        value={ingredienteEditadoIsUnit(ingrediente) ? 'un' : ingrediente.unidade}
                         onChange={(event) => atualizarIngrediente(index, 'unidade', event.target.value)}
+                        disabled={ingredienteEditadoIsUnit(ingrediente)}
                       >
-                        <option value="g">g</option>
-                        <option value="kg">kg</option>
+                        {ingredienteEditadoIsUnit(ingrediente) ? (
+                          <option value="un">unidades</option>
+                        ) : (
+                          <>
+                            <option value="g">g</option>
+                            <option value="kg">kg</option>
+                          </>
+                        )}
                       </select>
 
                       <button type="button" onClick={() => removerIngrediente(index)}>
@@ -435,7 +455,7 @@ export default function ProdutoIndividual() {
                   return (
                     <div key={`${ingrediente.nome}-${index}`} className={styles.row3}>
                       <span>{ingrediente.nome || '-'}</span>
-                      <span>{ingrediente.quantidade || '-'}g</span>
+                      <span>{ingrediente.quantidade || '-'}{ingrediente.unidade === 'un' ? ' un' : 'g'}</span>
                       <span>R$ {calculo.custo.toFixed(2)}</span>
                     </div>
                   );

@@ -10,6 +10,7 @@ import {
   deleteIngrediente,
 } from '@/services/back4app';
 import { useToast } from '../components/ToastProvider';
+import { normalizeMeasure } from '../utils/ingredients';
 
 export default function Ingredientes() {
   const toast = useToast();
@@ -18,6 +19,7 @@ export default function Ingredientes() {
   const [loading, setLoading] = useState(false);
   const [nome, setNome] = useState('');
   const [valor, setValor] = useState('');
+  const [unidadeMedida, setUnidadeMedida] = useState('kg');
   const [calcIngrediente, setCalcIngrediente] = useState('');
   const [calcPeso, setCalcPeso] = useState('');
   const [calcUnidade, setCalcUnidade] = useState('kg');
@@ -35,6 +37,7 @@ export default function Ingredientes() {
         id: item.objectId,
         nome: item.nome,
         valor: Number(item.valor || 0),
+        unidadeMedida: normalizeMeasure(item.unidadeMedida || item.medida),
       }));
       setItems(formatados);
       if (!calcIngrediente && formatados[0]) setCalcIngrediente(formatados[0].id);
@@ -86,7 +89,7 @@ export default function Ingredientes() {
       return;
     }
 
-    const novo = { nome, valor: Number(valor || 0) };
+    const novo = { nome, valor: Number(valor || 0), unidadeMedida };
 
     try {
       await createIngrediente(novo);
@@ -95,6 +98,7 @@ export default function Ingredientes() {
       setShowModal(false);
       setNome('');
       setValor('');
+      setUnidadeMedida('kg');
     } catch (error) {
       console.error(error);
       toast.error('Erro ao salvar ingrediente.');
@@ -105,6 +109,8 @@ export default function Ingredientes() {
     return items.find((item) => item.id === calcIngrediente);
   }, [items, calcIngrediente]);
 
+  const calcIsUnit = ingredienteCalculado?.unidadeMedida === 'unidade';
+
   const pesoEmKg = useMemo(() => {
     const peso = Number(calcPeso || 0);
     if (!peso || peso < 0) return 0;
@@ -112,8 +118,11 @@ export default function Ingredientes() {
   }, [calcPeso, calcUnidade]);
 
   const resultadoCalculadora = useMemo(() => {
+    if (calcIsUnit || calcUnidade === 'un') {
+      return Number(calcPeso || 0) * Number(ingredienteCalculado?.valor || 0);
+    }
     return pesoEmKg * Number(ingredienteCalculado?.valor || 0);
-  }, [pesoEmKg, ingredienteCalculado]);
+  }, [pesoEmKg, ingredienteCalculado, calcPeso, calcUnidade, calcIsUnit]);
 
   const calcErro = calcPeso && Number(calcPeso) < 0 ? 'Informe um peso positivo.' : '';
 
@@ -143,14 +152,22 @@ export default function Ingredientes() {
         <div className={styles.calculatorHeader}>
           <div>
             <h3>Calculadora de Ingredientes</h3>
-            <p>Simule o custo por peso usando o valor por kg cadastrado.</p>
+            <p>Simule o custo por peso ou unidade usando o valor cadastrado.</p>
           </div>
         </div>
 
         <div className={styles.calculatorGrid}>
           <label>
             Ingrediente
-            <select value={calcIngrediente} onChange={(e) => setCalcIngrediente(e.target.value)}>
+            <select
+              value={calcIngrediente}
+              onChange={(e) => {
+                setCalcIngrediente(e.target.value);
+                const selected = items.find((item) => item.id === e.target.value);
+                if (selected?.unidadeMedida === 'unidade') setCalcUnidade('un');
+                if (selected?.unidadeMedida !== 'unidade' && calcUnidade === 'un') setCalcUnidade('kg');
+              }}
+            >
               <option value="">Selecione</option>
               {items.map((item) => (
                 <option key={item.id} value={item.id}>
@@ -161,22 +178,28 @@ export default function Ingredientes() {
           </label>
 
           <label>
-            Peso
+            {calcIsUnit ? 'Quantidade' : 'Peso'}
             <input
               type="number"
               min="0"
               step="0.01"
               value={calcPeso}
               onChange={(e) => setCalcPeso(e.target.value)}
-              placeholder={calcUnidade === 'g' ? 'Ex: 500' : 'Ex: 2'}
+              placeholder={calcIsUnit ? 'Ex: 3' : calcUnidade === 'g' ? 'Ex: 500' : 'Ex: 2'}
             />
           </label>
 
           <label>
             Unidade
-            <select value={calcUnidade} onChange={(e) => setCalcUnidade(e.target.value)}>
-              <option value="kg">kg</option>
-              <option value="g">g</option>
+            <select value={calcIsUnit ? 'un' : calcUnidade} onChange={(e) => setCalcUnidade(e.target.value)} disabled={calcIsUnit}>
+              {calcIsUnit ? (
+                <option value="un">unidades</option>
+              ) : (
+                <>
+                  <option value="kg">kg</option>
+                  <option value="g">g</option>
+                </>
+              )}
             </select>
           </label>
 
@@ -184,7 +207,7 @@ export default function Ingredientes() {
             <span>Resultado</span>
             <strong>R$ {resultadoCalculadora.toFixed(2)}</strong>
             <small>
-              {ingredienteCalculado ? `R$ ${Number(ingredienteCalculado.valor || 0).toFixed(2)} / kg` : 'Selecione um ingrediente'}
+              {ingredienteCalculado ? `R$ ${Number(ingredienteCalculado.valor || 0).toFixed(2)} / ${ingredienteCalculado.unidadeMedida === 'unidade' ? 'unidade' : 'kg'}` : 'Selecione um ingrediente'}
             </small>
           </div>
         </div>
@@ -197,9 +220,13 @@ export default function Ingredientes() {
           <div className={styles.modal}>
             <h3>Novo Ingrediente</h3>
             <input placeholder="Nome" value={nome} onChange={(e) => setNome(e.target.value)} />
+            <select value={unidadeMedida} onChange={(e) => setUnidadeMedida(e.target.value)}>
+              <option value="kg">Quilos/gramas</option>
+              <option value="unidade">Unidades</option>
+            </select>
             <div className={styles.inputGroupSmall}>
               <span>R$</span>
-              <input placeholder="Valor por kg" type="number" value={valor} onChange={(e) => setValor(e.target.value)} />
+              <input placeholder={unidadeMedida === 'unidade' ? 'Valor por unidade' : 'Valor por kg'} type="number" value={valor} onChange={(e) => setValor(e.target.value)} />
             </div>
 
             <div className={styles.modalActions}>

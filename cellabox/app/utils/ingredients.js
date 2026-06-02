@@ -1,13 +1,18 @@
 export const DEFAULT_INGREDIENTS = [
-  { id: 'i1', nome: 'Chocolate', valor: 45.0 },
-  { id: 'i2', nome: 'Farinha', valor: 12.5 },
-  { id: 'i3', nome: 'Açúcar', valor: 8.75 },
+  { id: 'i1', nome: 'Chocolate', valor: 45.0, unidadeMedida: 'kg' },
+  { id: 'i2', nome: 'Farinha', valor: 12.5, unidadeMedida: 'kg' },
+  { id: 'i3', nome: 'Açúcar', valor: 8.75, unidadeMedida: 'kg' },
 ];
 
 const STORAGE_KEY = 'cellabox_ingredientes';
 
 export function normalizeName(value = '') {
   return value.trim().toLowerCase();
+}
+
+export function normalizeMeasure(value = '') {
+  if (value === 'un' || value === 'unidade' || value === 'unidades') return 'unidade';
+  return 'kg';
 }
 
 export function getStoredIngredients() {
@@ -31,12 +36,18 @@ export function calculateIngredientCost(ingredient, allIngredients) {
   const found = allIngredients.find(
     (item) => normalizeName(item.nome) === normalizeName(ingredient.nome)
   );
-  const valorKg = Number(found?.valor || ingredient.valorKg || 0);
-  const quantidadeGramas = Number(ingredient.quantidade || 0);
+  const unidadeMedida = normalizeMeasure(ingredient.unidadeMedida || found?.unidadeMedida || found?.medida);
+  const unidadeUso = ingredient.unidade === 'un' ? 'unidade' : ingredient.unidade;
+  const valor = Number(found?.valor || ingredient.valorKg || ingredient.valorUnidade || 0);
+  const quantidade = Number(ingredient.quantidade || 0);
+  const quantidadeGramas = unidadeUso === 'kg' ? quantidade * 1000 : quantidade;
+  const custo = unidadeMedida === 'unidade' ? valor * quantidade : (valor / 1000) * quantidadeGramas;
 
   return {
-    valorKg,
-    custo: (valorKg / 1000) * quantidadeGramas,
+    valorKg: unidadeMedida === 'kg' ? valor : 0,
+    valorUnidade: unidadeMedida === 'unidade' ? valor : 0,
+    unidadeMedida,
+    custo,
   };
 }
 

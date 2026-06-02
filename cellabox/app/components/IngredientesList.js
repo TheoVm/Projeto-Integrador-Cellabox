@@ -5,6 +5,10 @@ import styles from './list.module.css';
 export default function IngredientesList({ initial, onChange, onSave, onDelete }) {
   const items = initial || [];
 
+  function unitLabel(item) {
+    return item.unidadeMedida === 'unidade' ? 'R$ /un' : 'R$ /kg';
+  }
+
   function handleChange(id, value) {
     const num = parseFloat(value || 0);
     const updated = items.map((it) => (it.id === id ? { ...it, valor: num } : it));
@@ -23,7 +27,7 @@ export default function IngredientesList({ initial, onChange, onSave, onDelete }
         
         <div className={styles.rowHeader} style={gridStyle}>
           <div>Ingrediente</div>
-          <div style={{ textAlign: 'right' }}>Valor / kg</div>
+          <div style={{ textAlign: 'right' }}>Valor</div>
           <div></div> 
         </div>
 
@@ -40,7 +44,7 @@ export default function IngredientesList({ initial, onChange, onSave, onDelete }
                 onChange={(e) => handleChange(it.id, e.target.value)}
                 onBlur={(e) => onSave?.(it.id, e.target.value)} 
               />
-              <span className={styles.unit}>R$ /kg</span>
+              <span className={styles.unit}>{unitLabel(it)}</span>
             </div>
 
             <div className={styles.actionCell}>

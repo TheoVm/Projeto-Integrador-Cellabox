@@ -69,7 +69,9 @@
   box-shadow: var(--shadow);
 }
 
-.modal input, .modal textarea { 
+.modal input,
+.modal select,
+.modal textarea { 
   width: 100%;
   min-width: 0;
   padding:0.65rem 0.75rem; 
