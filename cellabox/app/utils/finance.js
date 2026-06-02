@@ -79,6 +79,32 @@ export function calculateSoldItemRevenue(item, produtosMap) {
   return unitPrice * quantity;
 }
 
+export function calculateSoldItemBreakdown(item, produtosMap = {}, ingredientesBase = []) {
+  const produto = getProductFromItem(item, produtosMap);
+  const embalagem = getItemPackaging(item, produto);
+  const pricing = getCombinationPricing(produto || {}, embalagem || {}, ingredientesBase);
+  const quantity = firstNumber(item.quantidade, item.qtd, 1) || 1;
+  const custoProduto = firstNumber(item.custoProduto, item.produtoCusto, item.custo) || pricing.custoBaseProduto;
+  const custoEmbalagem = firstNumber(item.embalagemCusto, item.custoEmbalagem) || pricing.custoEmbalagem;
+  const custoUnitario = firstNumber(item.custoTotalProducao, item.custoProducao) || custoProduto + custoEmbalagem;
+  const valorVenda = firstNumber(item.valorVenda, item.preco, item.valorUnitario, item.precoUnitario, item.embalagemPreco) || pricing.valorVenda;
+
+  return {
+    nomeProduto: item.nome || produto?.nome || 'Produto',
+    nomeEmbalagem: item.embalagemNome || embalagem?.nome || 'Embalagem',
+    quantidade: quantity,
+    custoProduto,
+    custoEmbalagem,
+    custoUnitario,
+    valorVenda,
+    totalCustoProduto: custoProduto * quantity,
+    totalCustoEmbalagem: custoEmbalagem * quantity,
+    totalCusto: custoUnitario * quantity,
+    totalVenda: valorVenda * quantity,
+    lucro: (valorVenda - custoUnitario) * quantity,
+  };
+}
+
 export function calculateOrderRevenue(pedido, produtosMap = {}) {
   const itemRevenue = (pedido.items || []).reduce((sum, item) => (
     sum + calculateSoldItemRevenue(item, produtosMap)
@@ -115,9 +141,12 @@ export function buildMonthlyFinanceSeries({ pedidos = [], gastos = [], produtosM
 
   return getRecentMonthKeys(Object.keys(months)).map((key) => {
     const month = addMonth(months, key);
+    const gastosGerais = month.gastos + month.custos;
     return {
       ...month,
-      lucro: month.receita - month.gastos - month.custos,
+      gastosLancados: month.gastos,
+      gastos: gastosGerais,
+      lucro: month.receita - gastosGerais,
     };
   });
 }
@@ -158,7 +187,9 @@ export function buildDailyFinanceSeries({
 
   return days.map((day) => ({
     ...day,
-    lucro: day.receita - day.gastos - day.custos,
+    gastosLancados: day.gastos,
+    gastos: day.gastos + day.custos,
+    lucro: day.receita - (day.gastos + day.custos),
   }));
 }
 

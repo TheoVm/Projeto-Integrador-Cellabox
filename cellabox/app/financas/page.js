@@ -21,6 +21,7 @@ import {
   calculateExpenseValue,
   calculateOrderCost,
   calculateOrderRevenue,
+  calculateSoldItemBreakdown,
   getAvailableFinancePeriods,
 } from '../utils/finance';
 import { useToast } from '../components/ToastProvider';
@@ -38,6 +39,7 @@ export default function Financas() {
   const [expenseValor, setExpenseValor] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
+  const [selectedSale, setSelectedSale] = useState(null);
 
   useEffect(() => {
     carregarTudo();
@@ -84,7 +86,7 @@ export default function Financas() {
     ), 0);
   }, [pedidos, produtosMap]);
 
-  const gastosTotais = useMemo(() => {
+  const gastosLancados = useMemo(() => {
     return (gastos || []).reduce((sum, gasto) => sum + calculateExpenseValue(gasto), 0);
   }, [gastos]);
 
@@ -94,7 +96,8 @@ export default function Financas() {
     ), 0);
   }, [pedidos, produtosMap, ingredientesBase]);
 
-  const lucroTotal = receitaTotal - gastosTotais - custoProdutos;
+  const gastosTotais = gastosLancados + custoProdutos;
+  const lucroTotal = receitaTotal - gastosTotais;
 
   const availablePeriods = useMemo(() => {
     return getAvailableFinancePeriods({ pedidos, gastos });
@@ -123,6 +126,45 @@ export default function Financas() {
       year: selectedYear,
     });
   }, [pedidos, gastos, produtosMap, ingredientesBase, selectedMonth, selectedYear]);
+
+  const vendasDetalhadas = useMemo(() => {
+    return (pedidos || []).map((pedido) => {
+      const items = pedido.items || [];
+      const total = calculateOrderRevenue(pedido, produtosMap);
+      const custo = calculateOrderCost(pedido, produtosMap, ingredientesBase);
+      return {
+        ...pedido,
+        totalCalculado: total,
+        custoCalculado: custo,
+        lucroCalculado: total - custo,
+        quantidadeItens: items.reduce((sum, item) => sum + Number(item.quantidade || item.qtd || 1), 0),
+      };
+    });
+  }, [pedidos, produtosMap, ingredientesBase]);
+
+  const selectedSaleBreakdown = useMemo(() => {
+    if (!selectedSale) return null;
+    const itens = (selectedSale.items || []).map((item) => (
+      calculateSoldItemBreakdown(item, produtosMap, ingredientesBase)
+    ));
+    const totalVenda = itens.reduce((sum, item) => sum + item.totalVenda, 0) || calculateOrderRevenue(selectedSale, produtosMap);
+    const totalCustoProduto = itens.reduce((sum, item) => sum + item.totalCustoProduto, 0);
+    const totalCustoEmbalagem = itens.reduce((sum, item) => sum + item.totalCustoEmbalagem, 0);
+    const totalCusto = itens.reduce((sum, item) => sum + item.totalCusto, 0);
+
+    return {
+      itens,
+      totalVenda,
+      totalCustoProduto,
+      totalCustoEmbalagem,
+      totalCusto,
+      lucro: totalVenda - totalCusto,
+    };
+  }, [selectedSale, produtosMap, ingredientesBase]);
+
+  function formatDate(date) {
+    return date ? new Date(date).toLocaleDateString('pt-BR') : '-';
+  }
 
   async function handleAddExpense() {
     if (!expenseNome || !expenseValor || Number(expenseValor) <= 0) {
@@ -166,7 +208,7 @@ export default function Financas() {
           <div className={pageStyles.chartHeader}>
             <div>
               <h3>Lucro e gastos por dia</h3>
-              <p>Receita, gastos e lucro diário do mês selecionado.</p>
+              <p>Receita, gastos gerais e lucro diário do mês selecionado.</p>
             </div>
             <div className={pageStyles.chartFilters}>
               <select value={selectedMonth} onChange={(event) => setSelectedMonth(Number(event.target.value))}>
@@ -200,6 +242,44 @@ export default function Financas() {
         </aside>
       </div>
 
+      <section className={pageStyles.salesSection}>
+        <div className={pageStyles.salesHeader}>
+          <div>
+            <h3>Tabela de vendas</h3>
+            <p>Todas as vendas registradas com total, custo e lucro estimado.</p>
+          </div>
+          <span>{vendasDetalhadas.length} vendas</span>
+        </div>
+
+        <div className={pageStyles.salesTable}>
+          <div className={pageStyles.salesTableHeader}>
+            <span>Cliente</span>
+            <span>Data</span>
+            <span>Itens</span>
+            <span>Total</span>
+            <span>Custo</span>
+            <span>Lucro</span>
+          </div>
+
+          {vendasDetalhadas.length === 0 ? (
+            <div className={pageStyles.emptySales}>Nenhuma venda registrada.</div>
+          ) : vendasDetalhadas.map((pedido) => (
+            <button
+              key={pedido.objectId || pedido.id}
+              className={pageStyles.salesRow}
+              onClick={() => setSelectedSale(pedido)}
+            >
+              <span>{pedido.clienteNome || 'Cliente'}</span>
+              <span>{formatDate(pedido.createdAt || pedido.data || pedido.date)}</span>
+              <span>{pedido.quantidadeItens}</span>
+              <strong>R$ {pedido.totalCalculado.toFixed(2)}</strong>
+              <strong>R$ {pedido.custoCalculado.toFixed(2)}</strong>
+              <strong>R$ {pedido.lucroCalculado.toFixed(2)}</strong>
+            </button>
+          ))}
+        </div>
+      </section>
+
       {showExpenseModal && (
         <div className={styles.overlay}>
           <div className={styles.modal}>
@@ -214,6 +294,61 @@ export default function Financas() {
             <div className={styles.modalActions}>
               <button onClick={() => setShowExpenseModal(false)}>Cancelar</button>
               <button className={styles.saveButton} onClick={handleAddExpense}>Salvar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedSale && selectedSaleBreakdown && (
+        <div className={styles.overlay}>
+          <div className={`${styles.modal} ${pageStyles.saleModal}`}>
+            <div className={pageStyles.saleModalHeader}>
+              <div>
+                <h3>Detalhes da venda</h3>
+                <p>{selectedSale.clienteNome || 'Cliente'} · {formatDate(selectedSale.createdAt || selectedSale.data || selectedSale.date)}</p>
+              </div>
+              <button onClick={() => setSelectedSale(null)}>Fechar</button>
+            </div>
+
+            <div className={pageStyles.saleSummary}>
+              <div>
+                <span>Total da venda</span>
+                <strong>R$ {selectedSaleBreakdown.totalVenda.toFixed(2)}</strong>
+              </div>
+              <div>
+                <span>Custo produtos</span>
+                <strong>R$ {selectedSaleBreakdown.totalCustoProduto.toFixed(2)}</strong>
+              </div>
+              <div>
+                <span>Custo embalagens</span>
+                <strong>R$ {selectedSaleBreakdown.totalCustoEmbalagem.toFixed(2)}</strong>
+              </div>
+              <div>
+                <span>Lucro estimado</span>
+                <strong>R$ {selectedSaleBreakdown.lucro.toFixed(2)}</strong>
+              </div>
+            </div>
+
+            <div className={pageStyles.saleItems}>
+              <div className={pageStyles.saleItemHeader}>
+                <span>Produto</span>
+                <span>Qtd</span>
+                <span>Produto</span>
+                <span>Embalagem</span>
+                <span>Total</span>
+              </div>
+              {selectedSaleBreakdown.itens.map((item, index) => (
+                <div key={`${item.nomeProduto}-${index}`} className={pageStyles.saleItemRow}>
+                  <span>
+                    <strong>{item.nomeProduto}</strong>
+                    <small>{item.nomeEmbalagem}</small>
+                  </span>
+                  <span>{item.quantidade}</span>
+                  <span>R$ {item.totalCustoProduto.toFixed(2)}</span>
+                  <span>R$ {item.totalCustoEmbalagem.toFixed(2)}</span>
+                  <strong>R$ {item.totalVenda.toFixed(2)}</strong>
+                </div>
+              ))}
             </div>
           </div>
         </div>

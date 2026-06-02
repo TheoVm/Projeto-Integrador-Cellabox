@@ -7,9 +7,10 @@ import styles from "./page.module.css";
 import {
   createProduto,
   getProdutos,
-  deletarProduto 
+  deletarProduto,
+  getIngredientes,
 } from "@/services/back4app";
-import { calculateIngredientCost, calculateProductCost, getStoredIngredients } from "../utils/ingredients";
+import { calculateIngredientCost, calculateProductCost, getStoredIngredients, normalizeMeasure } from "../utils/ingredients";
 import { getPackagingId, getStoredPackaging, saveStoredPackaging } from "../utils/packaging";
 import { useToast } from "../components/ToastProvider";
 
@@ -24,7 +25,7 @@ export default function ProdutosEmbalagens() {
   const [editingPackagingId, setEditingPackagingId] = useState(null);
 
   const [produtos, setProdutos] = useState([]);
-  const [ingredientesBase] = useState(() => getStoredIngredients());
+  const [ingredientesBase, setIngredientesBase] = useState(() => getStoredIngredients());
   const [embalagens, setEmbalagens] = useState(() => getStoredPackaging());
   const [embalagensSelecionadas, setEmbalagensSelecionadas] = useState([]);
 
@@ -34,7 +35,11 @@ export default function ProdutosEmbalagens() {
   const [preco, setPreco] = useState("");
 
   const [ingredientes, setIngredientes] = useState([
-    { nome: "", quantidade: "" }
+    {
+      nome: ingredientesBase[0]?.nome || "",
+      quantidade: "",
+      unidade: normalizeMeasure(ingredientesBase[0]?.unidadeMedida || ingredientesBase[0]?.medida) === "unidade" ? "un" : "g",
+    }
   ]);
 
   useEffect(() => {
@@ -42,20 +47,44 @@ export default function ProdutosEmbalagens() {
   }, []);
 
   async function carregarProdutos() {
-    const dados = await getProdutos();
+    const [dados, ingredientesData] = await Promise.all([getProdutos(), getIngredientes()]);
     setProdutos(dados);
+    const ingredientesFormatados = (ingredientesData || []).map((item) => ({
+      id: item.objectId || item.id,
+      objectId: item.objectId,
+      nome: item.nome,
+      valor: Number(item.valor || 0),
+      unidadeMedida: normalizeMeasure(item.unidadeMedida || item.medida),
+    }));
+    setIngredientesBase(ingredientesFormatados.length ? ingredientesFormatados : getStoredIngredients());
   }
 
   function addIngrediente() {
     setIngredientes([
       ...ingredientes,
-      { nome: "", quantidade: "" }
+      {
+        nome: ingredientesBase[0]?.nome || "",
+        quantidade: "",
+        unidade: normalizeMeasure(ingredientesBase[0]?.unidadeMedida || ingredientesBase[0]?.medida) === "unidade" ? "un" : "g",
+      }
     ]);
   }
 
   function updateIngrediente(index, field, value) {
     const novos = [...ingredientes];
-    novos[index][field] = value;
+    const atual = { ...novos[index] };
+
+    if (field === "quantidade") {
+      atual[field] = Number(value) < 0 ? "0" : value;
+    } else if (field === "nome") {
+      const selecionado = ingredientesBase.find((item) => item.nome === value);
+      atual.nome = value;
+      atual.unidade = normalizeMeasure(selecionado?.unidadeMedida || selecionado?.medida) === "unidade" ? "un" : "g";
+    } else {
+      atual[field] = value;
+    }
+
+    novos[index] = atual;
     setIngredientes(novos);
     setCusto(calculateProductCost(novos, ingredientesBase).toFixed(2));
   }
@@ -78,11 +107,20 @@ export default function ProdutosEmbalagens() {
     const ingredientesCalculados = ingredientes
       .filter((ingrediente) => ingrediente.nome && Number(ingrediente.quantidade || 0) > 0)
       .map((ingrediente) => {
-        const calculo = calculateIngredientCost(ingrediente, ingredientesBase);
-        return {
+        const quantidade = ingrediente.unidade === "kg"
+          ? Number(ingrediente.quantidade || 0) * 1000
+          : Number(ingrediente.quantidade || 0);
+        const normalizado = {
           ...ingrediente,
-          quantidade: Number(ingrediente.quantidade || 0),
+          quantidade,
+          unidade: ingrediente.unidade === "kg" ? "g" : ingrediente.unidade,
+        };
+        const calculo = calculateIngredientCost(normalizado, ingredientesBase);
+        return {
+          ...normalizado,
           valorKg: calculo.valorKg,
+          valorUnidade: calculo.valorUnidade,
+          unidadeMedida: calculo.unidadeMedida,
           custo: calculo.custo,
         };
       });
@@ -106,7 +144,11 @@ export default function ProdutosEmbalagens() {
       setDescricao("");
       setCusto("");
       setPreco("");
-      setIngredientes([{ nome: "", quantidade: "" }]);
+      setIngredientes([{
+        nome: ingredientesBase[0]?.nome || "",
+        quantidade: "",
+        unidade: normalizeMeasure(ingredientesBase[0]?.unidadeMedida || ingredientesBase[0]?.medida) === "unidade" ? "un" : "g",
+      }]);
       setEmbalagensSelecionadas([]);
       setShowModal(false);
 
@@ -162,7 +204,11 @@ export default function ProdutosEmbalagens() {
     setDescricao("");
     setCusto("");
     setPreco("");
-    setIngredientes([{ nome: "", quantidade: "" }]);
+    setIngredientes([{
+      nome: ingredientesBase[0]?.nome || "",
+      quantidade: "",
+      unidade: normalizeMeasure(ingredientesBase[0]?.unidadeMedida || ingredientesBase[0]?.medida) === "unidade" ? "un" : "g",
+    }]);
     setEmbalagensSelecionadas([]);
     setEditingPackagingId(null);
     setShowModal(false);
@@ -293,7 +339,12 @@ export default function ProdutosEmbalagens() {
             />
 
             <div className={view === "produtos" ? styles.rowInputs : styles.singleInputRow}>
-              <div className={styles.inputGroup}>
+              {view === "produtos" ? (
+                <div className={styles.costPreview}>
+                  <span>Custo calculado</span>
+                  <strong>R$ {Number(custo || 0).toFixed(2)}</strong>
+                </div>
+              ) : <div className={styles.inputGroup}>
                 <span>R$</span>
                 <input
                   placeholder={view === "produtos" ? "Custo calculado" : "Custo de produção"}
@@ -302,7 +353,7 @@ export default function ProdutosEmbalagens() {
                   readOnly={view === "produtos"}
                   onChange={(e) => setCusto(e.target.value)}
                 />
-              </div>
+              </div>}
 
               {view === "produtos" && <div className={styles.inputGroup}>
                 <span>R$</span>
@@ -321,27 +372,42 @@ export default function ProdutosEmbalagens() {
               <span>Ingredientes</span>
               {ingredientes.map((ing, index) => (
                 <div key={index} className={styles.ingredienteRow}>
-                  <input
-                    list="ingredientes-cadastrados"
+                  <select
                     className={styles.ingredienteNome}
                     value={ing.nome}
                     onChange={(e) => updateIngrediente(index, "nome", e.target.value)}
-                    placeholder="Nome do ingrediente"
-                  />
-                  <datalist id="ingredientes-cadastrados">
+                  >
+                    <option value="">Selecione o ingrediente</option>
                     {ingredientesBase.map((item) => (
-                      <option key={item.id || item.nome} value={item.nome} />
+                      <option key={item.id || item.nome} value={item.nome}>
+                        {item.nome} - R$ {Number(item.valor || 0).toFixed(2)} / {normalizeMeasure(item.unidadeMedida || item.medida) === "unidade" ? "un" : "kg"}
+                      </option>
                     ))}
-                  </datalist>
+                  </select>
 
-                  <div className={styles.inputGroupSmall}>
+                  <div className={styles.quantityUnitGroup}>
                     <input
                       type="number"
+                      min="0"
+                      step="0.01"
                       value={ing.quantidade}
                       onChange={(e) => updateIngrediente(index, "quantidade", e.target.value)}
                       placeholder="Qtd"
                     />
-                    <span>g</span>
+                    <select
+                      value={ing.unidade}
+                      onChange={(e) => updateIngrediente(index, "unidade", e.target.value)}
+                      disabled={normalizeMeasure(ingredientesBase.find((item) => item.nome === ing.nome)?.unidadeMedida) === "unidade"}
+                    >
+                      {normalizeMeasure(ingredientesBase.find((item) => item.nome === ing.nome)?.unidadeMedida) === "unidade" ? (
+                        <option value="un">un</option>
+                      ) : (
+                        <>
+                          <option value="g">g</option>
+                          <option value="kg">kg</option>
+                        </>
+                      )}
+                    </select>
                   </div>
                 </div>
               ))}
